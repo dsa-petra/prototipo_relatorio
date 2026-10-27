@@ -32,8 +32,8 @@ st.divider()
 # --- CONEXÃO COM A NUVEM (SUPABASE) ---
 @st.cache_resource
 def init_connection():
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
+    url = st.secrets["https://sfvbwgmwyrfsnmehsjbt.supabase.co"]
+    key = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmdmJ3Z213eXJmc25tZWhzamJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTIxMzcsImV4cCI6MjEwODY4ODEzN30.7o4pfXEAjBLuzJ598djf-VsdZ7-qj0fvePOn369REPM"]
     return create_client(url, key)
 
 supabase = init_connection()
