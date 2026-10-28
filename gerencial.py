@@ -186,14 +186,39 @@ def tela_operacao():
 
     with c_parada:
         with st.popover("🛑 Parada"):
+            st.markdown("**Registro de Parada**")
             res_par = supabase.table("motivos_parada").select("motivo").in_("tipo_equipamento", [st.session_state.tipo_equipamento, 'ambos']).execute()
             opcoes_parada = [m['motivo'] for m in res_par.data] if res_par.data else ["Nenhuma"]
-            motivo_sel = st.selectbox("Selecione:", opcoes_parada)
+            motivo_sel = st.selectbox("Motivo da Parada:", opcoes_parada)
+            
+            # Novos campos de horário inicial e final
+            c_h1, c_h2 = st.columns(2)
+            hora_inicio = c_h1.time_input("Horário Inicial")
+            hora_fim = c_h2.time_input("Horário Final")
+            
             if st.button("Avisar PCP", use_container_width=True):
-                supabase.table("registros_parciais").insert({"data": data_hoje, "hora": slot_atual, "equipamento": st.session_state.tag_equipamento, "operador": st.session_state.usuario, "tipo_registro": "Parada", "detalhes": {"motivo": motivo_sel}}).execute()
+                h_ini_str = hora_inicio.strftime("%H:%M")
+                h_fim_str = hora_fim.strftime("%H:%M")
+                texto_causa = f"{motivo_sel} ({h_ini_str} às {h_fim_str})"
+                
+                detalhes_parada = {
+                    "motivo": motivo_sel,
+                    "inicio": h_ini_str,
+                    "fim": h_fim_str
+                }
+                
+                supabase.table("registros_parciais").insert({
+                    "data": data_hoje, 
+                    "hora": slot_atual, 
+                    "equipamento": st.session_state.tag_equipamento, 
+                    "operador": st.session_state.usuario, 
+                    "tipo_registro": "Parada", 
+                    "detalhes": detalhes_parada
+                }).execute()
+                
                 tabela_gestor = "horaria_carga" if e_caminhao else "horaria_perf"
-                supabase.table(tabela_gestor).update({"causa": motivo_sel}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-                st.success("Parada registrada!")
+                supabase.table(tabela_gestor).update({"causa": texto_causa}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
+                st.success("Parada registrada com sucesso!")
 
     st.write("---")
 
