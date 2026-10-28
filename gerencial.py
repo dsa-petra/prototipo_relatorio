@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import calendar
 import time
 from datetime import datetime, timedelta
@@ -22,6 +23,7 @@ st.markdown(f"""
     .kpi-card {{ background-color: {COR_AZUL}; color: white; padding: 20px; border-radius: 10px; text-align: center; border-left: 5px solid {COR_AMARELA}; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }}
     .kpi-title {{ font-size: 1.1rem; margin-bottom: 5px; opacity: 0.9; }}
     .kpi-value {{ font-size: 2.5rem; font-weight: bold; color: {COR_AMARELA}; margin: 0; }}
+    .kpi-sub {{ font-size: 1rem; color: #e0e0e0; }}
     .cal-header {{ font-weight: bold; text-align: center; color: {COR_AZUL}; background-color: #f0f2f6; padding: 5px; border-radius: 5px; }}
     
     .login-box {{ background: linear-gradient(135deg, #ffffff 0%, #f4f6f9 100%); padding: 50px 30px; border-radius: 20px; box-shadow: 0px 20px 40px rgba(0,0,0,0.08); border-top: 8px solid {COR_AZUL}; margin-top: 50px; }}
@@ -40,11 +42,15 @@ st.markdown(f"""
     button:has(p:contains("➖")) {{ background: linear-gradient(180deg, #ff5252 0%, #ff1744 100%) !important; color: white !important; height: 120px !important; border-radius: 25px !important; border: 2px solid #d50000 !important; box-shadow: 0px 8px 15px rgba(255,23,68,0.3) !important; transition: all 0.2s !important; }}
     button:has(p:contains("➖")):active {{ transform: translateY(4px) !important; box-shadow: 0px 4px 10px rgba(255,23,68,0.3) !important; }}
     button:has(p:contains("➖")) p {{ font-size: 60px !important; font-weight: bold; margin: 0; line-height: 50px; }}
+    
+    .dir-card {{ background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid {COR_AZUL}; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
+    .dir-titulo {{ font-size: 14px; color: #6c757d; font-weight: bold; text-transform: uppercase; }}
+    .dir-valor {{ font-size: 24px; font-weight: 900; color: {COR_AZUL}; margin-top: 5px; }}
     </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. CONEXÃO COM A NUVEM E ESTADO
+# 2. CONEXÃO E ESTADO
 # ==========================================
 @st.cache_resource
 def init_connection():
@@ -68,10 +74,14 @@ if "sync_pendente" not in st.session_state: st.session_state.sync_pendente = Fal
 if "ultima_alteracao" not in st.session_state: st.session_state.ultima_alteracao = 0
 if "slot_selecionado_estado" not in st.session_state: st.session_state.slot_selecionado_estado = None
 
+# Horários baseados no padrão Petra
+HORARIOS_TURNO = ["06:15", "07:00", "08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00"]
+
 def obter_horario_sugerido():
     agora = datetime.now()
     hora = agora.hour
-    if 7 <= hora < 8: return "07:15"
+    if 6 <= hora < 7: return "06:15"
+    elif 7 <= hora < 8: return "07:00"
     elif 8 <= hora < 9: return "08:00"
     elif 9 <= hora < 10: return "09:00"
     elif 10 <= hora < 11: return "10:00"
@@ -79,15 +89,15 @@ def obter_horario_sugerido():
     elif 13 <= hora < 14: return "13:00"
     elif 14 <= hora < 15: return "14:00"
     elif 15 <= hora < 16: return "15:00"
-    elif 16 <= hora < 17: return "16:00"
-    else: return "07:15"
+    else: return "06:15"
 
 def carregar_dados_gestor():
     df_c = pd.DataFrame(supabase.table("horaria_carga").select("*").execute().data)
     df_p = pd.DataFrame(supabase.table("horaria_perf").select("*").execute().data)
     df_pt = pd.DataFrame(supabase.table("parte_diaria").select("*").execute().data)
     df_pcp = pd.DataFrame(supabase.table("pcp_planejamento").select("*").execute().data)
-    return df_c, df_p, df_pt, df_pcp
+    df_rp = pd.DataFrame(supabase.table("registros_parciais").select("*").execute().data)
+    return df_c, df_p, df_pt, df_pcp, df_rp
 
 # ==========================================
 # 3. TELAS DO SISTEMA
@@ -108,18 +118,14 @@ def tela_login():
             if st.form_submit_button("Acessar o Sistema", use_container_width=True):
                 user_limpo = usuario.lower().strip()
                 res = supabase.table("usuarios").select("*").eq("login", user_limpo).eq("senha", senha).eq("ativo", True).execute()
-                
                 if res.data:
                     user_data = res.data[0]
                     st.session_state.usuario = user_data["nome"]
                     st.session_state.perfil = user_data["perfil"]
-                    if st.session_state.perfil == "gestor":
-                        st.session_state.tela_atual = "gestor"
-                    else:
-                        st.session_state.tela_atual = "selecao_maquina"
+                    st.session_state.tela_atual = "gestor" if user_data["perfil"] == "gestor" else "selecao_maquina"
                     st.rerun()
                 else:
-                    st.error("⚠️ Credenciais inválidas. Verifique seu acesso.")
+                    st.error("⚠️ Credenciais inválidas.")
         st.markdown("</div>", unsafe_allow_html=True)
 
 def tela_selecao_maquina():
@@ -147,14 +153,11 @@ def tela_operacao():
     
     st.markdown(f"**👤 {st.session_state.usuario}** | **🚜 {st.session_state.tag_equipamento}**")
     
-    horarios_turno = ["07:15", "08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"]
-    if st.session_state.slot_selecionado_estado not in horarios_turno:
+    if st.session_state.slot_selecionado_estado not in HORARIOS_TURNO:
         st.session_state.slot_selecionado_estado = obter_horario_sugerido()
     
-    idx_padrao = horarios_turno.index(st.session_state.slot_selecionado_estado)
-    
     st.markdown("### ⏰ Selecione a Hora do Apontamento")
-    slot_atual = st.selectbox("Horário:", horarios_turno, index=idx_padrao)
+    slot_atual = st.selectbox("Horário:", HORARIOS_TURNO, index=HORARIOS_TURNO.index(st.session_state.slot_selecionado_estado))
     
     if slot_atual != st.session_state.slot_selecionado_estado:
         st.session_state.slot_selecionado_estado = slot_atual
@@ -170,53 +173,50 @@ def tela_operacao():
                     supabase.table("horaria_carga").update({coluna_db: st.session_state.prod_val}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
                 else:
                     supabase.table("horaria_perf").update({"realizado": st.session_state.prod_val}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-                
                 st.session_state.sync_pendente = False
                 st.toast(f"☁️ Apontamento das {slot_atual} salvo na nuvem!", icon="✅")
             except Exception:
                 st.toast("⚠️ Sem sinal de internet. Tentando salvar novamente...", icon="🔄")
 
-    c_check, c_parada = st.columns(2)
+    # Botoes Superiores
+    c_check, c_parada, c_abastecimento = st.columns(3)
     with c_check:
-        with st.popover("📋 Checklist"):
+        with st.popover("📋 Checklist", use_container_width=True):
             res_chk = supabase.table("itens_checklist").select("item").in_("tipo_equipamento", [st.session_state.tipo_equipamento, 'ambos']).execute()
-            respostas_chk = {}
-            if res_chk.data:
-                for i, linha in enumerate(res_chk.data):
-                    respostas_chk[linha['item']] = st.selectbox(f"{linha['item']}:", ["OK", "Atenção", "Crítico"], key=f"chk_{i}")
+            respostas_chk = {linha['item']: st.selectbox(f"{linha['item']}:", ["OK", "Atenção", "Crítico"], key=f"chk_{i}") for i, linha in enumerate(res_chk.data or [])}
             if st.button("Enviar ao PCP", use_container_width=True):
                 supabase.table("registros_parciais").insert({"data": data_hoje, "hora": slot_atual, "equipamento": st.session_state.tag_equipamento, "operador": st.session_state.usuario, "tipo_registro": "Checklist", "detalhes": respostas_chk}).execute()
                 st.success("Enviado!")
 
     with c_parada:
-        with st.popover("🛑 Parada"):
-            st.markdown(f"**Registro de Parada ({slot_atual})**")
+        with st.popover("🛑 Parada", use_container_width=True):
             res_par = supabase.table("motivos_parada").select("motivo").in_("tipo_equipamento", [st.session_state.tipo_equipamento, 'ambos']).execute()
             opcoes_parada = [m['motivo'] for m in res_par.data] if res_par.data else ["Nenhuma"]
-            motivo_sel = st.selectbox("Motivo da Parada:", opcoes_parada)
-            
+            motivo_sel = st.selectbox("Motivo:", opcoes_parada)
             c_h1, c_h2 = st.columns(2)
-            hora_inicio = c_h1.time_input("Horário Inicial")
-            hora_fim = c_h2.time_input("Horário Final")
-            
+            hora_inicio = c_h1.time_input("Início")
+            hora_fim = c_h2.time_input("Fim")
             if st.button("Avisar PCP", use_container_width=True):
                 h_ini_str = hora_inicio.strftime("%H:%M")
                 h_fim_str = hora_fim.strftime("%H:%M")
-                texto_causa = f"{motivo_sel} ({h_ini_str} às {h_fim_str})"
-                
                 detalhes_parada = {"motivo": motivo_sel, "inicio": h_ini_str, "fim": h_fim_str}
-                
-                supabase.table("registros_parciais").insert({
-                    "data": data_hoje, "hora": slot_atual, "equipamento": st.session_state.tag_equipamento, 
-                    "operador": st.session_state.usuario, "tipo_registro": "Parada", "detalhes": detalhes_parada
-                }).execute()
-                
+                supabase.table("registros_parciais").insert({"data": data_hoje, "hora": slot_atual, "equipamento": st.session_state.tag_equipamento, "operador": st.session_state.usuario, "tipo_registro": "Parada", "detalhes": detalhes_parada}).execute()
                 tabela_gestor = "horaria_carga" if e_caminhao else "horaria_perf"
-                supabase.table(tabela_gestor).update({"causa": texto_causa}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-                st.success("Parada registrada com sucesso!")
+                supabase.table(tabela_gestor).update({"causa": f"{motivo_sel} ({h_ini_str}-{h_fim_str})"}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
+                st.success("Parada registrada!")
+
+    with c_abastecimento:
+        with st.popover("⛽ Abastecimento", use_container_width=True):
+            litros = st.number_input("Litros:", min_value=0.0, step=1.0)
+            horimetro_abast = st.number_input("Horímetro Atual:", min_value=0.0, step=0.1)
+            if st.button("Gravar Abastecimento", use_container_width=True):
+                detalhes_abast = {"litros": litros, "horimetro": horimetro_abast}
+                supabase.table("registros_parciais").insert({"data": data_hoje, "hora": slot_atual, "equipamento": st.session_state.tag_equipamento, "operador": st.session_state.usuario, "tipo_registro": "Abastecimento", "detalhes": detalhes_abast}).execute()
+                st.success("Abastecimento gravado!")
 
     st.write("---")
 
+    # Tela Apontamento
     res_pcp = supabase.table("pcp_planejamento").select("*").eq("data", data_hoje).execute()
     meta_viagens = res_pcp.data[0]['meta_viagens_equipe_hora'] if res_pcp.data else 0
     meta_metros = res_pcp.data[0]['meta_perf_metros_hora'] if res_pcp.data else 0.0
@@ -229,46 +229,21 @@ def tela_operacao():
             res_hora = supabase.table("horaria_carga").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
         
         df_hora = pd.DataFrame(res_hora.data)
-        
-        if not st.session_state.sync_pendente:
-            if coluna_db in df_hora.columns:
-                st.session_state.prod_val = df_hora.iloc[0][coluna_db]
+        if not st.session_state.sync_pendente and coluna_db in df_hora.columns:
+            st.session_state.prod_val = df_hora.iloc[0][coluna_db]
         
         valor_equipe = sum([df_hora.iloc[0][col] for col in df_hora.columns if 'ut' in col.lower()])
-        
-        st.markdown(f"""
-            <div class='meta-box'>
-                <div>
-                    <span class='meta-titulo'>META (P)</span>
-                    <span class='meta-destaque'>{meta_viagens if meta_viagens>0 else 'N/A'} viag.</span>
-                </div>
-                <div>
-                    <span class='meta-titulo'>REALIZADO EQUIPE (R)</span>
-                    <span class='meta-destaque'>{valor_equipe} viag.</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown(f"<div class='meta-box'><div><span class='meta-titulo'>META (P)</span><span class='meta-destaque'>{meta_viagens if meta_viagens>0 else 'N/A'} viag.</span></div><div><span class='meta-titulo'>REALIZADO EQUIPE (R)</span><span class='meta-destaque'>{valor_equipe} viag.</span></div></div>", unsafe_allow_html=True)
         c_menos, c_valor, c_mais = st.columns([1, 1.5, 1])
         with c_menos:
             if st.button("➖", key="sub_v", use_container_width=True):
                 st.session_state.prod_val = max(0, int(st.session_state.prod_val) - 1)
-                st.session_state.sync_pendente = True
-                st.session_state.ultima_alteracao = time.time()
-                st.rerun()
-                
-        with c_valor:
-            st.markdown(f"<div class='valor-gigante'>{int(st.session_state.prod_val)}</div>", unsafe_allow_html=True)
-            
+                st.session_state.sync_pendente = True; st.session_state.ultima_alteracao = time.time(); st.rerun()
+        with c_valor: st.markdown(f"<div class='valor-gigante'>{int(st.session_state.prod_val)}</div>", unsafe_allow_html=True)
         with c_mais:
             if st.button("➕", key="add_v", use_container_width=True):
                 st.session_state.prod_val = int(st.session_state.prod_val) + 1
-                st.session_state.sync_pendente = True
-                st.session_state.ultima_alteracao = time.time()
-                st.rerun()
-                
-        if st.session_state.sync_pendente:
-            st.markdown("<p style='text-align:center; color:#7f8c8d; font-size:12px;'>Salvando na nuvem em breve...</p>", unsafe_allow_html=True)
+                st.session_state.sync_pendente = True; st.session_state.ultima_alteracao = time.time(); st.rerun()
             
     else: 
         res_hora = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
@@ -279,92 +254,47 @@ def tela_operacao():
         if not st.session_state.sync_pendente:
             st.session_state.prod_val = res_hora.data[0]['realizado']
             
-        st.markdown(f"""
-            <div class='meta-box'>
-                <div>
-                    <span class='meta-titulo'>META (P)</span>
-                    <span class='meta-destaque'>{meta_metros if meta_metros>0 else 'N/A'} m</span>
-                </div>
-                <div>
-                    <span class='meta-titulo'>REALIZADO (R)</span>
-                    <span class='meta-destaque'>{float(st.session_state.prod_val):.1f} m</span>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
+        st.markdown(f"<div class='meta-box'><div><span class='meta-titulo'>META (P)</span><span class='meta-destaque'>{meta_metros if meta_metros>0 else 'N/A'} m</span></div><div><span class='meta-titulo'>REALIZADO (R)</span><span class='meta-destaque'>{float(st.session_state.prod_val):.1f} m</span></div></div>", unsafe_allow_html=True)
         c_menos, c_valor, c_mais = st.columns([1, 1.5, 1])
         with c_menos:
             if st.button("➖", key="sub_p", use_container_width=True):
                 st.session_state.prod_val = max(0.0, float(st.session_state.prod_val) - 1.0)
-                st.session_state.sync_pendente = True
-                st.session_state.ultima_alteracao = time.time()
-                st.rerun()
-                
-        with c_valor:
-            st.markdown(f"<div class='valor-gigante'>{float(st.session_state.prod_val):.1f}</div>", unsafe_allow_html=True)
-            
+                st.session_state.sync_pendente = True; st.session_state.ultima_alteracao = time.time(); st.rerun()
+        with c_valor: st.markdown(f"<div class='valor-gigante'>{float(st.session_state.prod_val):.1f}</div>", unsafe_allow_html=True)
         with c_mais:
             if st.button("➕", key="add_p", use_container_width=True):
                 st.session_state.prod_val = float(st.session_state.prod_val) + 1.0
-                st.session_state.sync_pendente = True
-                st.session_state.ultima_alteracao = time.time()
-                st.rerun()
-
-    st.divider()
-
-    st.markdown(f"<h4 style='color:{COR_AZUL};'>📊 Resumo do Turno</h4>", unsafe_allow_html=True)
-    if e_caminhao:
-        res_dia = supabase.table("horaria_carga").select("*").eq("data_id", data_hoje).execute()
-    else:
-        res_dia = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).execute()
-        
-    if res_dia.data:
-        df_dia = pd.DataFrame(res_dia.data)
-        tabela_resumo = []
-        for hora in horarios_turno:
-            linha = df_dia[df_dia['hora'] == hora]
-            if not linha.empty:
-                m_h = linha.iloc[0]['meta']
-                if e_caminhao:
-                    cols_ut = [c for c in linha.columns if 'ut' in c.lower()]
-                    r_h = sum([linha.iloc[0][c] for c in cols_ut])
-                else:
-                    r_h = linha.iloc[0]['realizado']
-                
-                pct = (r_h / m_h * 100) if m_h > 0 else 0
-                tabela_resumo.append({
-                    "Horário": hora,
-                    "P (Meta)": int(m_h) if e_caminhao else float(m_h),
-                    "R (Realizado)": int(r_h) if e_caminhao else float(r_h),
-                    "% Alcance": f"{pct:.0f}%"
-                })
-        
-        if tabela_resumo:
-            st.dataframe(pd.DataFrame(tabela_resumo), use_container_width=True, hide_index=True)
-        else:
-            st.write("Sem registros no turno de hoje.")
+                st.session_state.sync_pendente = True; st.session_state.ultima_alteracao = time.time(); st.rerun()
 
     st.write("---")
     
-    with st.expander("📝 Preencher Relatório Diário", expanded=False):
+    # Fechamento Turno
+    with st.expander("📝 Preencher Relatório Diário (Fechamento)", expanded=False):
         with st.form("form_parte_diaria"):
-            col_h1, col_h2 = st.columns(2)
-            h_inicial = col_h1.number_input("Horímetro Inicial:", min_value=0.0, step=0.1, format="%.1f")
-            h_final = col_h2.number_input("Horímetro Final:", min_value=0.0, step=0.1, format="%.1f")
+            col_hm1, col_hm2 = st.columns(2)
+            h_inicial = col_hm1.number_input("Horímetro Motor (Inicial):", min_value=0.0, step=0.1)
+            h_final = col_hm2.number_input("Horímetro Motor (Final):", min_value=0.0, step=0.1)
+            
+            hm_inicial, hm_final = 0.0, 0.0
+            if not e_caminhao:
+                st.markdown("---")
+                col_hmt1, col_hmt2 = st.columns(2)
+                hm_inicial = col_hmt1.number_input("Horímetro Martelo (Inicial):", min_value=0.0, step=0.1)
+                hm_final = col_hmt2.number_input("Horímetro Martelo (Final):", min_value=0.0, step=0.1)
+                
             obs = st.text_area("Observações Gerais (Opcional):")
             
             if st.form_submit_button("✅ Enviar e Fechar Parte Diária", use_container_width=True):
                 if h_final >= h_inicial:
                     dados = {
-                        "data": data_hoje,
-                        "equipamento": st.session_state.tag_equipamento,
-                        "operador": st.session_state.usuario,
-                        "horimetro_inicial": h_inicial,
-                        "horimetro_final": h_final,
-                        "observacoes": obs
+                        "data": data_hoje, "equipamento": st.session_state.tag_equipamento, "operador": st.session_state.usuario,
+                        "horimetro_inicial": h_inicial, "horimetro_final": h_final, "observacoes": obs
                     }
+                    if not e_caminhao:
+                        dados["horimetro_martelo_inicial"] = hm_inicial
+                        dados["horimetro_martelo_final"] = hm_final
                     supabase.table("parte_diaria").insert(dados).execute()
-                    st.success("Parte diária enviada com sucesso para o PCP!")
+                    st.success("Relatório de Turno enviado com sucesso!")
                 else:
                     st.error("Erro: O Horímetro Final é menor que o Inicial.")
 
@@ -372,124 +302,136 @@ def tela_gestor():
     col_logo, col_titulo = st.columns([1, 4])
     with col_titulo:
         st.markdown(f"<h1 style='color: {COR_AZUL};'>📊 Painel de Controle - Operação</h1>", unsafe_allow_html=True)
-        st.markdown(f"**Gestor:** {st.session_state.usuario} | **Status:** <span style='color:{COR_AMARELA};'>⚫ Nuvem Ativa</span>", unsafe_allow_html=True)
     st.divider()
 
-    df_carga, df_perf, df_parte, df_pcp = carregar_dados_gestor()
+    df_carga, df_perf, df_parte, df_pcp, df_rp = carregar_dados_gestor()
     data_hoje_str = datetime.today().strftime('%Y-%m-%d')
     
+    # Cálculos KPI Hoje
     df_carga_hoje = df_carga[df_carga['data_id'] == data_hoje_str] if not df_carga.empty else pd.DataFrame()
-    total_viagens = df_carga_hoje['ut33'].sum() + df_carga_hoje['ut34'].sum() if not df_carga_hoje.empty else 0
     df_perf_hoje = df_perf[df_perf['data_id'] == data_hoje_str] if not df_perf.empty else pd.DataFrame()
+    
+    # Somar todas as colunas que começam com 'ut' (Caminhões)
+    cols_ut = [c for c in df_carga_hoje.columns if 'ut' in c.lower()] if not df_carga_hoje.empty else []
+    total_viagens = df_carga_hoje[cols_ut].sum().sum() if not df_carga_hoje.empty else 0
+    meta_viagens = df_carga_hoje['meta'].sum() if not df_carga_hoje.empty else 0
+    
     total_metros = df_perf_hoje['realizado'].sum() if not df_perf_hoje.empty else 0
+    meta_metros = df_perf_hoje['meta'].sum() if not df_perf_hoje.empty else 0
 
-    c1, c2, c3 = st.columns(3)
-    c1.markdown(f"<div class='kpi-card'><p class='kpi-title'>Total Viagens (Hoje)</p><p class='kpi-value'>🚛 {int(total_viagens)}</p></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='kpi-card'><p class='kpi-title'>Metros (Hoje)</p><p class='kpi-value'>🎯 {total_metros:.1f} m</p></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='kpi-card'><p class='kpi-title'>Relatórios Turno</p><p class='kpi-value'>📋 {len(df_parte)}</p></div>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    c1.markdown(f"<div class='kpi-card'><p class='kpi-title'>Viagens (Realizado / Planejado)</p><p class='kpi-value'>🚛 {int(total_viagens)} / {int(meta_viagens)}</p></div>", unsafe_allow_html=True)
+    c2.markdown(f"<div class='kpi-card'><p class='kpi-title'>Metros (Realizado / Planejado)</p><p class='kpi-value'>🎯 {total_metros:.1f} / {meta_metros:.1f}</p></div>", unsafe_allow_html=True)
     st.write("") 
 
-    aba_hoje, aba_pcp, aba_diretoria, aba_dados, aba_config = st.tabs(["📈 Produção (Hoje)", "⚙️ Planejamento PCP", "📊 Visão Diretoria", "🗄️ Dados Brutos", "🛠️ Cadastros"])
-
-    with aba_hoje:
-        st.info("Painel de acompanhamento diário ativo. Visualize os KPI's acima.")
+    aba_pcp, aba_diretoria, aba_dados, aba_config = st.tabs(["📋 Acompanhamento Diário", "📊 Visão Diretoria", "🗄️ Dados Brutos", "🛠️ Cadastros"])
 
     with aba_pcp:
-        st.subheader("Planejamento Mensal de Lavra")
-        hoje = datetime.today()
-        meses = [f"{(hoje.replace(day=1) - timedelta(days=30*i)).year}-{(hoje.replace(day=1) - timedelta(days=30*i)).month:02d}" for i in range(6, -1, -1)]
-        mes_selecionado = st.selectbox("Selecione o Mês:", reversed(meses))
+        st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>Acompanhamento Diário de Produção</h3>", unsafe_allow_html=True)
         
-        ano_sel, mes_sel = map(int, mes_selecionado.split('-'))
-        cal = calendar.Calendar(firstweekday=6)
-        matriz_dias = cal.monthdayscalendar(ano_sel, mes_sel)
+        # Filtro de Data
+        dia_alvo = st.date_input("Selecionar Data:", datetime.today())
+        dia_alvo_str = dia_alvo.strftime("%Y-%m-%d")
         
-        dias_semana = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SAB"]
-        cols_dias = st.columns(7)
-        for i, d in enumerate(dias_semana): cols_dias[i].markdown(f"<div class='cal-header'>{d}</div>", unsafe_allow_html=True)
+        df_carga_alvo = df_carga[df_carga['data_id'] == dia_alvo_str] if not df_carga.empty else pd.DataFrame()
         
-        for semana in matriz_dias:
-            cols_semana = st.columns(7)
-            for i, dia in enumerate(semana):
-                if dia != 0:
-                    data_formatada = f"{ano_sel}-{mes_sel:02d}-{dia:02d}"
-                    if cols_semana[i].button(f"{dia:02d}", key=data_formatada, type="primary" if data_formatada == data_hoje_str else "secondary", use_container_width=True):
-                        st.session_state.dia_explodido = data_formatada
-                else:
-                    cols_semana[i].write("")
-        st.divider()
-
-        if st.session_state.dia_explodido:
-            dia_alvo = st.session_state.dia_explodido
-            df_meta = df_pcp[df_pcp['data'] == dia_alvo] if not df_pcp.empty else pd.DataFrame()
-            m_viagens = df_meta.iloc[0]['meta_viagens_equipe_hora'] if not df_meta.empty else 0
-            m_metros = df_meta.iloc[0]['meta_perf_metros_hora'] if not df_meta.empty else 0.0
-
-            with st.form(f"form_pcp_{dia_alvo}"):
-                c_prod, c_perf = st.columns(2)
-                nova_meta_v = c_prod.number_input(f"Meta Viagens ({dia_alvo}):", value=int(m_viagens), step=1)
-                nova_meta_m = c_perf.number_input(f"Meta Metros ({dia_alvo}):", value=float(m_metros), step=1.0)
-                if st.form_submit_button("💾 Salvar Planejamento na Nuvem", use_container_width=True):
-                    supabase.table("pcp_planejamento").upsert({"data": dia_alvo, "meta_viagens_equipe_hora": nova_meta_v, "meta_perf_metros_hora": nova_meta_m}).execute()
-                    st.success("Atualizado!")
-                    st.rerun()
-
-        st.divider()
-        st.markdown(f"<h4 style='color:{COR_AZUL};'>📅 Resumo do Mês ({mes_selecionado})</h4>", unsafe_allow_html=True)
-        
-        df_pcp_mes = df_pcp[df_pcp['data'].str.startswith(mes_selecionado)] if not df_pcp.empty else pd.DataFrame()
-        if not df_pcp_mes.empty:
-            df_pcp_mes = df_pcp_mes.sort_values(by='data')
-            df_pcp_resumo = df_pcp_mes.rename(columns={
-                'data': 'Data',
-                'meta_viagens_equipe_hora': 'Meta Carga (Viagens/h)',
-                'meta_perf_metros_hora': 'Meta Perf. (Metros/h)'
-            })
-            st.dataframe(df_pcp_resumo, use_container_width=True, hide_index=True)
+        if not df_carga_alvo.empty:
+            tabela_excel = []
+            totais = {"ut33": 0, "ut34": 0, "r_hora": 0, "m_hora": 0}
+            
+            for hora in HORARIOS_TURNO:
+                linha = df_carga_alvo[df_carga_alvo['hora'] == hora]
+                v_ut33 = linha.iloc[0]['ut33'] if not linha.empty and 'ut33' in linha.columns else 0
+                v_ut34 = linha.iloc[0]['ut34'] if not linha.empty and 'ut34' in linha.columns else 0
+                meta = linha.iloc[0]['meta'] if not linha.empty else 0
+                causa = linha.iloc[0]['causa'] if not linha.empty else ""
+                
+                realizado_h = v_ut33 + v_ut34
+                pct = f"{(realizado_h / meta * 100):.0f}%" if meta > 0 else "0%"
+                
+                tabela_excel.append({
+                    "HORARIO": hora, "UT-33": v_ut33, "UT-34": v_ut34, 
+                    "Realizado Hora": realizado_h, "Meta Hora": meta, "%": pct, "Causas": causa
+                })
+                totais["ut33"] += v_ut33; totais["ut34"] += v_ut34; totais["r_hora"] += realizado_h; totais["m_hora"] += meta
+            
+            df_ex = pd.DataFrame(tabela_excel)
+            st.dataframe(df_ex, use_container_width=True, hide_index=True)
+            
+            st.markdown(f"**Viagens Realizadas (Total): {totais['r_hora']}** | **Tonelada Produzida (Est.): {totais['r_hora']*34} t**")
+            
+            # Gráfico Comparativo similar ao Excel
+            fig = go.Figure()
+            fig.add_trace(go.Bar(x=df_ex['HORARIO'], y=df_ex['Realizado Hora'], name='Realizado', marker_color='#4682B4'))
+            fig.add_trace(go.Bar(x=df_ex['HORARIO'], y=df_ex['Meta Hora'], name='Meta', marker_color='#B0C4DE'))
+            fig.update_layout(title="Produção vs Meta (Hora a Hora)", barmode='group', plot_bgcolor=COR_FUNDO)
+            st.plotly_chart(fig, use_container_width=True)
         else:
-            st.warning("Nenhum planejamento salvo para este mês.")
+            st.warning("Sem dados de produção (carga) para o dia selecionado.")
 
     with aba_diretoria:
-        st.markdown("### Consolidado Global")
-        if not df_carga.empty and not df_perf.empty:
-            df_carga['ano'] = pd.to_datetime(df_carga['data_id']).dt.year.astype(str)
-            df_carga['mes'] = pd.to_datetime(df_carga['data_id']).dt.strftime('%m')
-            df_carga['ano_mes'] = pd.to_datetime(df_carga['data_id']).dt.strftime('%Y-%m')
+        st.markdown(f"<h3 style='color:{COR_AZUL};'>Indicadores de Desempenho</h3>", unsafe_allow_html=True)
+        filtro_mes = st.selectbox("Mês de Referência:", [datetime.today().strftime('%Y-%m')] + sorted(list(set(pd.to_datetime(df_rp['data']).dt.strftime('%Y-%m')) if not df_rp.empty else []), reverse=True))
+        
+        # Filtros e Cálculos
+        df_c_dir = df_carga[df_carga['data_id'].str.startswith(filtro_mes)] if not df_carga.empty else pd.DataFrame()
+        df_p_dir = df_perf[df_perf['data_id'].str.startswith(filtro_mes)] if not df_perf.empty else pd.DataFrame()
+        df_pt_dir = df_parte[df_parte['data'].str.startswith(filtro_mes)] if not df_parte.empty else pd.DataFrame()
+        df_rp_dir = df_rp[df_rp['data'].str.startswith(filtro_mes)] if not df_rp.empty else pd.DataFrame()
+        
+        # 1. Metros por Hora (Total Metros / Qtde de horas com apontamento)
+        t_metros = df_p_dir['realizado'].sum() if not df_p_dir.empty else 0
+        h_perf = len(df_p_dir[df_p_dir['realizado'] > 0]) if not df_p_dir.empty else 0
+        metros_h = t_metros / h_perf if h_perf > 0 else 0
+        
+        # 2. Viagens por Hora
+        cols_ut_dir = [c for c in df_c_dir.columns if 'ut' in c.lower()] if not df_c_dir.empty else []
+        t_viag = df_c_dir[cols_ut_dir].sum().sum() if not df_c_dir.empty else 0
+        h_carga = len(df_c_dir) if not df_c_dir.empty else 0
+        viag_h = t_viag / h_carga if h_carga > 0 else 0
+        
+        # 3. % Martelo / Motor
+        pct_martelo = "N/A"
+        if not df_pt_dir.empty and 'horimetro_martelo_final' in df_pt_dir.columns:
+            df_perf_pt = df_pt_dir[df_pt_dir['horimetro_martelo_final'].notna()]
+            if not df_perf_pt.empty:
+                t_motor = (pd.to_numeric(df_perf_pt['horimetro_final']) - pd.to_numeric(df_perf_pt['horimetro_inicial'])).sum()
+                t_martelo = (pd.to_numeric(df_perf_pt['horimetro_martelo_final']) - pd.to_numeric(df_perf_pt['horimetro_martelo_inicial'])).sum()
+                if t_motor > 0: pct_martelo = f"{(t_martelo / t_motor * 100):.1f}%"
+        
+        # 4. Consumo (Abastecimentos)
+        litros_total = 0
+        if not df_rp_dir.empty:
+            df_abast = df_rp_dir[df_rp_dir['tipo_registro'] == 'Abastecimento']
+            for d in df_abast['detalhes']:
+                if isinstance(d, dict) and 'litros' in d: litros_total += float(d['litros'])
+        
+        # 5. Paradas (Count)
+        qtd_paradas = len(df_rp_dir[df_rp_dir['tipo_registro'] == 'Parada']) if not df_rp_dir.empty else 0
 
-            df_perf['ano'] = pd.to_datetime(df_perf['data_id']).dt.year.astype(str)
-            df_perf['mes'] = pd.to_datetime(df_perf['data_id']).dt.strftime('%m')
-            df_perf['ano_mes'] = pd.to_datetime(df_perf['data_id']).dt.strftime('%Y-%m')
+        c_d1, c_d2, c_d3, c_d4, c_d5 = st.columns(5)
+        c_d1.markdown(f"<div class='dir-card'><div class='dir-titulo'>Metros / Hora</div><div class='dir-valor'>{metros_h:.1f} m/h</div></div>", unsafe_allow_html=True)
+        c_d2.markdown(f"<div class='dir-card'><div class='dir-titulo'>Viagens / Hora</div><div class='dir-valor'>{viag_h:.1f} v/h</div></div>", unsafe_allow_html=True)
+        c_d3.markdown(f"<div class='dir-card'><div class='dir-titulo'>% Utilização Martelo</div><div class='dir-valor'>{pct_martelo}</div></div>", unsafe_allow_html=True)
+        c_d4.markdown(f"<div class='dir-card'><div class='dir-titulo'>Consumo Combustível</div><div class='dir-valor'>{litros_total:,.0f} L</div></div>", unsafe_allow_html=True)
+        c_d5.markdown(f"<div class='dir-card'><div class='dir-titulo'>Ocorrências de Parada</div><div class='dir-valor'>{qtd_paradas}</div></div>", unsafe_allow_html=True)
 
-            anos = ["Todos"] + sorted(list(df_carga['ano'].unique()), reverse=True)
-            meses_op = ["Todos", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-            
-            c_f1, c_f2 = st.columns(2)
-            ano_f = c_f1.selectbox("📅 Ano:", anos)
-            mes_f = c_f2.selectbox("📆 Mês:", meses_op)
-
-            df_c_f, df_p_f = df_carga.copy(), df_perf.copy()
-            if ano_f != "Todos": df_c_f, df_p_f = df_c_f[df_c_f['ano'] == ano_f], df_p_f[df_p_f['ano'] == ano_f]
-            if mes_f != "Todos": df_c_f, df_p_f = df_c_f[df_c_f['mes'] == mes_f], df_p_f[df_p_f['mes'] == mes_f]
-
-            col_d1, col_d2 = st.columns(2)
-            with col_d1:
-                df_carga_mes = df_c_f.groupby('ano_mes')[['ut33', 'ut34']].sum().reset_index()
-                if not df_carga_mes.empty:
-                    fig_c = px.bar(df_carga_mes.melt(id_vars='ano_mes'), x='ano_mes', y='value', color='variable', barmode='stack', color_discrete_sequence=[COR_AZUL, COR_AMARELA])
-                    fig_c.update_layout(plot_bgcolor=COR_FUNDO, paper_bgcolor=COR_FUNDO)
-                    st.plotly_chart(fig_c, use_container_width=True)
-            with col_d2:
-                df_perf_mes = df_p_f.groupby('ano_mes')['realizado'].sum().reset_index()
-                if not df_perf_mes.empty:
-                    fig_p = px.area(df_perf_mes, x='ano_mes', y='realizado', color_discrete_sequence=[COR_AMARELA])
-                    fig_p.update_layout(plot_bgcolor=COR_FUNDO, paper_bgcolor=COR_FUNDO)
-                    st.plotly_chart(fig_p, use_container_width=True)
+        st.write("---")
+        st.markdown("**Análise de Paradas por Motivo**")
+        if qtd_paradas > 0:
+            paradas_lista = [d['motivo'] for d in df_rp_dir[df_rp_dir['tipo_registro'] == 'Parada']['detalhes'] if isinstance(d, dict) and 'motivo' in d]
+            if paradas_lista:
+                df_graf_paradas = pd.Series(paradas_lista).value_counts().reset_index()
+                df_graf_paradas.columns = ['Motivo', 'Quantidade']
+                fig_par = px.pie(df_graf_paradas, names='Motivo', values='Quantidade', hole=0.4)
+                st.plotly_chart(fig_par, use_container_width=True)
 
     with aba_dados:
-        c_t1, c_t2, c_t3 = st.tabs(["Carga", "Perfuração", "Fechamentos (Parte Diária)"])
+        c_t1, c_t2, c_t3, c_t4 = st.tabs(["Carga", "Perfuração", "Fechamentos", "Registros Parciais"])
         with c_t1: st.dataframe(df_carga, use_container_width=True)
         with c_t2: st.dataframe(df_perf, use_container_width=True)
         with c_t3: st.dataframe(df_parte, use_container_width=True)
+        with c_t4: st.dataframe(df_rp, use_container_width=True)
 
     with aba_config:
         st.subheader("Gerenciar Listas do Operador")
@@ -504,9 +446,14 @@ def tela_gestor():
                     supabase.table("motivos_parada").insert({"motivo": novo_motivo, "tipo_equipamento": tipo_m}).execute()
                     st.success("Motivo Adicionado!")
             
-            st.markdown("Motivos Atuais:")
+            st.markdown("**🗑️ Excluir Motivo**")
             df_motivos = pd.DataFrame(supabase.table("motivos_parada").select("*").execute().data)
-            st.dataframe(df_motivos, hide_index=True)
+            if not df_motivos.empty:
+                motivo_del = st.selectbox("Selecione para excluir:", df_motivos['motivo'])
+                if st.button("Excluir Motivo Selecionado"):
+                    supabase.table("motivos_parada").delete().eq("motivo", motivo_del).execute()
+                    st.success("Excluído com sucesso!")
+                    st.rerun()
 
         with col_check:
             st.markdown("**📋 Adicionar Item de Checklist**")
@@ -517,9 +464,14 @@ def tela_gestor():
                     supabase.table("itens_checklist").insert({"item": novo_check, "tipo_equipamento": tipo_c}).execute()
                     st.success("Item Adicionado!")
             
-            st.markdown("Checklist Atual:")
+            st.markdown("**🗑️ Excluir Item de Checklist**")
             df_checks = pd.DataFrame(supabase.table("itens_checklist").select("*").execute().data)
-            st.dataframe(df_checks, hide_index=True)
+            if not df_checks.empty:
+                check_del = st.selectbox("Selecione para excluir:", df_checks['item'])
+                if st.button("Excluir Item Selecionado"):
+                    supabase.table("itens_checklist").delete().eq("item", check_del).execute()
+                    st.success("Excluído com sucesso!")
+                    st.rerun()
 
 # ==========================================
 # 4. CONTROLADOR MESTRE DE ROTAS
@@ -532,22 +484,15 @@ if st.session_state.perfil is not None:
         
         if st.session_state.perfil == "gestor":
             if st.button("📊 Painel Gerencial", use_container_width=True):
-                st.session_state.tela_atual = "gestor"
-                st.rerun()
+                st.session_state.tela_atual = "gestor"; st.rerun()
             if st.button("📱 Simular Operador", use_container_width=True):
-                st.session_state.tela_atual = "selecao_maquina"
-                st.rerun()
+                st.session_state.tela_atual = "selecao_maquina"; st.rerun()
                 
         st.divider()
         if st.button("🚪 Sair (Logout)", use_container_width=True):
-            st.session_state.clear()
-            st.rerun()
+            st.session_state.clear(); st.rerun()
 
-if st.session_state.tela_atual == "login":
-    tela_login()
-elif st.session_state.tela_atual == "selecao_maquina":
-    tela_selecao_maquina()
-elif st.session_state.tela_atual == "operacao":
-    tela_operacao()
-elif st.session_state.tela_atual == "gestor" and st.session_state.perfil == "gestor":
-    tela_gestor()
+if st.session_state.tela_atual == "login": tela_login()
+elif st.session_state.tela_atual == "selecao_maquina": tela_selecao_maquina()
+elif st.session_state.tela_atual == "operacao": tela_operacao()
+elif st.session_state.tela_atual == "gestor" and st.session_state.perfil == "gestor": tela_gestor()
