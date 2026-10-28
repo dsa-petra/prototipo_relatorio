@@ -147,9 +147,6 @@ def tela_operacao():
     
     st.markdown(f"**👤 {st.session_state.usuario}** | **🚜 {st.session_state.tag_equipamento}**")
     
-    # ---------------------------------------------------------
-    # RELÓGIO HORA A HORA (SELETOR)
-    # ---------------------------------------------------------
     horarios_turno = ["07:15", "08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"]
     if st.session_state.slot_selecionado_estado not in horarios_turno:
         st.session_state.slot_selecionado_estado = obter_horario_sugerido()
@@ -164,9 +161,6 @@ def tela_operacao():
         st.session_state.sync_pendente = False
         st.rerun()
 
-    # ---------------------------------------------------------
-    # MOTOR DE SINCRONIZAÇÃO ASSÍNCRONA
-    # ---------------------------------------------------------
     if st.session_state.sync_pendente:
         tempo_passado = time.time() - st.session_state.ultima_alteracao
         if tempo_passado >= 10:
@@ -182,9 +176,6 @@ def tela_operacao():
             except Exception:
                 st.toast("⚠️ Sem sinal de internet. Tentando salvar novamente...", icon="🔄")
 
-    # ---------------------------------------------------------
-    # MENU SUPERIOR: Checklist e Paradas
-    # ---------------------------------------------------------
     c_check, c_parada = st.columns(2)
     with c_check:
         with st.popover("📋 Checklist"):
@@ -226,9 +217,6 @@ def tela_operacao():
 
     st.write("---")
 
-    # ---------------------------------------------------------
-    # TELA DE APONTAMENTO
-    # ---------------------------------------------------------
     res_pcp = supabase.table("pcp_planejamento").select("*").eq("data", data_hoje).execute()
     meta_viagens = res_pcp.data[0]['meta_viagens_equipe_hora'] if res_pcp.data else 0
     meta_metros = res_pcp.data[0]['meta_perf_metros_hora'] if res_pcp.data else 0.0
@@ -248,7 +236,6 @@ def tela_operacao():
         
         valor_equipe = sum([df_hora.iloc[0][col] for col in df_hora.columns if 'ut' in col.lower()])
         
-        # NOVO BANNER: META vs REALIZADO (Carga)
         st.markdown(f"""
             <div class='meta-box'>
                 <div>
@@ -283,7 +270,7 @@ def tela_operacao():
         if st.session_state.sync_pendente:
             st.markdown("<p style='text-align:center; color:#7f8c8d; font-size:12px;'>Salvando na nuvem em breve...</p>", unsafe_allow_html=True)
             
-    else: # Perfuração
+    else: 
         res_hora = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
         if not res_hora.data:
             supabase.table("horaria_perf").insert({"data_id": data_hoje, "hora": slot_atual, "realizado": 0.0, "meta": meta_metros, "causa": ""}).execute()
@@ -292,7 +279,6 @@ def tela_operacao():
         if not st.session_state.sync_pendente:
             st.session_state.prod_val = res_hora.data[0]['realizado']
             
-        # NOVO BANNER: META vs REALIZADO (Perfuração)
         st.markdown(f"""
             <div class='meta-box'>
                 <div>
@@ -326,9 +312,6 @@ def tela_operacao():
 
     st.divider()
 
-    # ---------------------------------------------------------
-    # NOVO: TABELA DE RESUMO DO TURNO (P | R | %)
-    # ---------------------------------------------------------
     st.markdown(f"<h4 style='color:{COR_AZUL};'>📊 Resumo do Turno</h4>", unsafe_allow_html=True)
     if e_caminhao:
         res_dia = supabase.table("horaria_carga").select("*").eq("data_id", data_hoje).execute()
@@ -363,9 +346,6 @@ def tela_operacao():
 
     st.write("---")
     
-    # ---------------------------------------------------------
-    # FECHAMENTO DO TURNO (Parte Diária)
-    # ---------------------------------------------------------
     with st.expander("📝 Preencher Relatório Diário", expanded=False):
         with st.form("form_parte_diaria"):
             col_h1, col_h2 = st.columns(2)
@@ -453,6 +433,21 @@ def tela_gestor():
                     supabase.table("pcp_planejamento").upsert({"data": dia_alvo, "meta_viagens_equipe_hora": nova_meta_v, "meta_perf_metros_hora": nova_meta_m}).execute()
                     st.success("Atualizado!")
                     st.rerun()
+
+        st.divider()
+        st.markdown(f"<h4 style='color:{COR_AZUL};'>📅 Resumo do Mês ({mes_selecionado})</h4>", unsafe_allow_html=True)
+        
+        df_pcp_mes = df_pcp[df_pcp['data'].str.startswith(mes_selecionado)] if not df_pcp.empty else pd.DataFrame()
+        if not df_pcp_mes.empty:
+            df_pcp_mes = df_pcp_mes.sort_values(by='data')
+            df_pcp_resumo = df_pcp_mes.rename(columns={
+                'data': 'Data',
+                'meta_viagens_equipe_hora': 'Meta Carga (Viagens/h)',
+                'meta_perf_metros_hora': 'Meta Perf. (Metros/h)'
+            })
+            st.dataframe(df_pcp_resumo, use_container_width=True, hide_index=True)
+        else:
+            st.warning("Nenhum planejamento salvo para este mês.")
 
     with aba_diretoria:
         st.markdown("### Consolidado Global")
