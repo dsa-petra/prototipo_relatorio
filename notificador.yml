@@ -2,9 +2,8 @@ name: Notificador Telegram PCP
 
 on:
   schedule:
-    # Roda sempre ao minuto 5 de todas as horas (08:05, 09:05, etc.)
     - cron: '5 * * * *'
-  workflow_dispatch: # Permite rodar manualmente com um botão para testar
+  workflow_dispatch:
 
 jobs:
   executar_script:
