@@ -18,24 +18,16 @@ COR_FUNDO = "rgba(0,0,0,0)"
 
 st.markdown(f"""
     <style>
-    /* Estilos Gerais */
     .kpi-card {{ background-color: {COR_AZUL}; color: white; padding: 20px; border-radius: 10px; text-align: center; border-left: 5px solid {COR_AMARELA}; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }}
     .kpi-title {{ font-size: 1.1rem; margin-bottom: 5px; opacity: 0.9; }}
     .kpi-value {{ font-size: 2.5rem; font-weight: bold; color: {COR_AMARELA}; margin: 0; }}
     .cal-header {{ font-weight: bold; text-align: center; color: {COR_AZUL}; background-color: #f0f2f6; padding: 5px; border-radius: 5px; }}
     div[data-testid="stButton"] button {{ border-radius: 10px; font-weight: bold; }}
-    
-    /* Botões Operação */
     .btn-operacao button {{ height: 80px !important; font-size: 30px !important; background-color: {COR_AZUL} !important; color: white !important; width: 100%; }}
     .btn-operacao button:active {{ background-color: {COR_AMARELA} !important; color: black !important; }}
     .valor-gigante {{ font-size: 60px; font-weight: bold; text-align: center; color: {COR_AMARELA}; }}
     .meta-box {{ background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; border-left: 5px solid {COR_AZUL}; margin-bottom: 10px; }}
     .meta-destaque {{ font-size: 25px; font-weight: bold; color: {COR_AZUL}; display: block; margin-top: 5px;}}
-    
-    /* Novo Estilo: Tela de Login */
-    [data-testid="stForm"] {{ background-color: #ffffff; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-top: 8px solid {COR_AZUL}; }}
-    .login-title {{ text-align: center; color: {COR_AZUL}; font-weight: bold; font-size: 28px; margin-bottom: 10px; }}
-    .login-subtitle {{ text-align: center; color: #666; font-size: 16px; margin-bottom: 30px; }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -85,19 +77,17 @@ def carregar_dados_gestor():
 # ==========================================
 
 def tela_login():
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns([1, 1.2, 1])
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
+        st.image("https://via.placeholder.com/600x150.png?text=PETRA+AGREGADOS", use_container_width=True)
+        st.markdown(f"<h2 style='text-align:center; color:{COR_AZUL};'>Portal de Acesso PCP</h2>", unsafe_allow_html=True)
         with st.form("form_login"):
-            st.markdown(f"<div class='login-title'>🏢 Petra Agregados</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='login-subtitle'>Sistema Integrado de PCP e FMS</div>", unsafe_allow_html=True)
-            
-            usuario = st.text_input("👤 Usuário:", placeholder="Digite seu usuário")
-            senha = st.text_input("🔑 Senha:", type="password", placeholder="Digite sua senha")
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.form_submit_button("🚀 Entrar no Sistema", use_container_width=True):
+            usuario = st.text_input("Usuário:")
+            senha = st.text_input("Senha:", type="password")
+            if st.form_submit_button("Entrar no Sistema", use_container_width=True):
                 user_limpo = usuario.lower().strip()
+                
+                # VERIFICAÇÃO DIRETA NO SUPABASE (Tabela usuarios)
                 res = supabase.table("usuarios").select("*").eq("login", user_limpo).eq("senha", senha).eq("ativo", True).execute()
                 
                 if res.data:
@@ -163,77 +153,52 @@ def tela_operacao():
     # Lógica de Apontamento
     if slot_atual == "Fora de Turno":
         st.warning("Fora do horário de operação da mina.")
-    else:
-        res_pcp = supabase.table("pcp_planejamento").select("*").eq("data", data_hoje).execute()
-        meta_viagens = res_pcp.data[0]['meta_viagens_equipe_hora'] if res_pcp.data else 0
-        meta_metros = res_pcp.data[0]['meta_perf_metros_hora'] if res_pcp.data else 0.0
+        return
 
-        st.markdown("<div class='btn-operacao'>", unsafe_allow_html=True)
-        if e_caminhao:
-            coluna_db = st.session_state.tag_equipamento.lower().replace("-", "")
+    res_pcp = supabase.table("pcp_planejamento").select("*").eq("data", data_hoje).execute()
+    meta_viagens = res_pcp.data[0]['meta_viagens_equipe_hora'] if res_pcp.data else 0
+    meta_metros = res_pcp.data[0]['meta_perf_metros_hora'] if res_pcp.data else 0.0
+
+    st.markdown("<div class='btn-operacao'>", unsafe_allow_html=True)
+    if e_caminhao:
+        coluna_db = st.session_state.tag_equipamento.lower().replace("-", "")
+        res_hora = supabase.table("horaria_carga").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
+        if not res_hora.data:
+            supabase.table("horaria_carga").insert({"data_id": data_hoje, "hora": slot_atual, "ut33": 0, "ut34": 0, "meta": meta_viagens, "causa": ""}).execute()
             res_hora = supabase.table("horaria_carga").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-            if not res_hora.data:
-                supabase.table("horaria_carga").insert({"data_id": data_hoje, "hora": slot_atual, "ut33": 0, "ut34": 0, "meta": meta_viagens, "causa": ""}).execute()
-                res_hora = supabase.table("horaria_carga").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-            
-            df_hora = pd.DataFrame(res_hora.data)
-            if coluna_db in df_hora.columns:
-                valor_individual = df_hora.iloc[0][coluna_db]
-                valor_equipe = sum([df_hora.iloc[0][col] for col in df_hora.columns if 'ut' in col.lower()])
-                st.markdown(f"<div class='meta-box'>Sua Carga: <b>{valor_individual}</b> | Equipe: <span class='meta-destaque'>{valor_equipe} / {meta_viagens if meta_viagens>0 else 'N/A'}</span></div>", unsafe_allow_html=True)
-
-                c_menos, c_valor, c_mais = st.columns([1, 1.5, 1])
-                if c_menos.button("➖", key="sub_v"):
-                    supabase.table("horaria_carga").update({coluna_db: max(0, int(valor_individual) - 1)}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-                    st.rerun()
-                c_valor.markdown(f"<div class='valor-gigante'>{int(valor_individual)}</div>", unsafe_allow_html=True)
-                if c_mais.button("➕", key="add_v"):
-                    supabase.table("horaria_carga").update({coluna_db: int(valor_individual) + 1}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-                    st.rerun()
-        else:
-            res_hora = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-            if not res_hora.data:
-                supabase.table("horaria_perf").insert({"data_id": data_hoje, "hora": slot_atual, "realizado": 0.0, "meta": meta_metros, "causa": ""}).execute()
-                res_hora = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-
-            valor_perf = res_hora.data[0]['realizado']
-            st.markdown(f"<div class='meta-box'>Perfuração Realizada: <span class='meta-destaque'>{valor_perf:.1f} / {meta_metros if meta_metros>0 else 'N/A'} m</span></div>", unsafe_allow_html=True)
+        
+        df_hora = pd.DataFrame(res_hora.data)
+        if coluna_db in df_hora.columns:
+            valor_individual = df_hora.iloc[0][coluna_db]
+            valor_equipe = sum([df_hora.iloc[0][col] for col in df_hora.columns if 'ut' in col.lower()])
+            st.markdown(f"<div class='meta-box'>Sua Carga: <b>{valor_individual}</b> | Equipe: <span class='meta-destaque'>{valor_equipe} / {meta_viagens if meta_viagens>0 else 'N/A'}</span></div>", unsafe_allow_html=True)
 
             c_menos, c_valor, c_mais = st.columns([1, 1.5, 1])
-            if c_menos.button("➖", key="sub_p"):
-                supabase.table("horaria_perf").update({"realizado": max(0.0, float(valor_perf) - 1.0)}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
+            if c_menos.button("➖", key="sub_v"):
+                supabase.table("horaria_carga").update({coluna_db: max(0, int(valor_individual) - 1)}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
                 st.rerun()
-            c_valor.markdown(f"<div class='valor-gigante'>{valor_perf:.1f}</div>", unsafe_allow_html=True)
-            if c_mais.button("➕", key="add_p"):
-                supabase.table("horaria_perf").update({"realizado": float(valor_perf) + 1.0}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
+            c_valor.markdown(f"<div class='valor-gigante'>{int(valor_individual)}</div>", unsafe_allow_html=True)
+            if c_mais.button("➕", key="add_v"):
+                supabase.table("horaria_carga").update({coluna_db: int(valor_individual) + 1}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
                 st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        res_hora = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
+        if not res_hora.data:
+            supabase.table("horaria_perf").insert({"data_id": data_hoje, "hora": slot_atual, "realizado": 0.0, "meta": meta_metros, "causa": ""}).execute()
+            res_hora = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
 
-    st.divider()
-    
-    # Nova Seção: Fechamento da Parte Diária (Sempre Visível no Fundo)
-    st.markdown(f"<h3 style='color:{COR_AZUL};'>📝 Relatório de Parte Diária</h3>", unsafe_allow_html=True)
-    with st.expander("Finalizar e Enviar Turno", expanded=False):
-        with st.form("form_parte_diaria"):
-            col_h1, col_h2 = st.columns(2)
-            h_inicial = col_h1.number_input("Horímetro Inicial:", min_value=0.0, step=0.1, format="%.1f")
-            h_final = col_h2.number_input("Horímetro Final:", min_value=0.0, step=0.1, format="%.1f")
-            obs = st.text_area("Observações Gerais do Turno (Opcional):")
-            
-            if st.form_submit_button("✅ Enviar Relatório Diário", use_container_width=True):
-                if h_final >= h_inicial:
-                    dados_parte_diaria = {
-                        "data": data_hoje,
-                        "equipamento": st.session_state.tag_equipamento,
-                        "operador": st.session_state.usuario,
-                        "horimetro_inicial": h_inicial,
-                        "horimetro_final": h_final,
-                        "observacoes": obs
-                    }
-                    supabase.table("parte_diaria").insert(dados_parte_diaria).execute()
-                    st.success("Parte diária enviada com sucesso para o PCP!")
-                else:
-                    st.error("O Horímetro Final não pode ser menor que o Inicial.")
+        valor_perf = res_hora.data[0]['realizado']
+        st.markdown(f"<div class='meta-box'>Perfuração Realizada: <span class='meta-destaque'>{valor_perf:.1f} / {meta_metros if meta_metros>0 else 'N/A'} m</span></div>", unsafe_allow_html=True)
+
+        c_menos, c_valor, c_mais = st.columns([1, 1.5, 1])
+        if c_menos.button("➖", key="sub_p"):
+            supabase.table("horaria_perf").update({"realizado": max(0.0, float(valor_perf) - 1.0)}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
+            st.rerun()
+        c_valor.markdown(f"<div class='valor-gigante'>{valor_perf:.1f}</div>", unsafe_allow_html=True)
+        if c_mais.button("➕", key="add_p"):
+            supabase.table("horaria_perf").update({"realizado": float(valor_perf) + 1.0}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
 def tela_gestor():
     col_logo, col_titulo = st.columns([1, 4])
@@ -328,4 +293,78 @@ def tela_gestor():
                 df_carga_mes = df_c_f.groupby('ano_mes')[['ut33', 'ut34']].sum().reset_index()
                 if not df_carga_mes.empty:
                     fig_c = px.bar(df_carga_mes.melt(id_vars='ano_mes'), x='ano_mes', y='value', color='variable', barmode='stack', color_discrete_sequence=[COR_AZUL, COR_AMARELA])
-                    fig_c.upda
+                    fig_c.update_layout(plot_bgcolor=COR_FUNDO, paper_bgcolor=COR_FUNDO)
+                    st.plotly_chart(fig_c, use_container_width=True)
+            with col_d2:
+                df_perf_mes = df_p_f.groupby('ano_mes')['realizado'].sum().reset_index()
+                if not df_perf_mes.empty:
+                    fig_p = px.area(df_perf_mes, x='ano_mes', y='realizado', color_discrete_sequence=[COR_AMARELA])
+                    fig_p.update_layout(plot_bgcolor=COR_FUNDO, paper_bgcolor=COR_FUNDO)
+                    st.plotly_chart(fig_p, use_container_width=True)
+
+    with aba_dados:
+        c_t1, c_t2, c_t3 = st.tabs(["Carga", "Perfuração", "Fechamentos"])
+        with c_t1: st.dataframe(df_carga, use_container_width=True)
+        with c_t2: st.dataframe(df_perf, use_container_width=True)
+        with c_t3: st.dataframe(df_parte, use_container_width=True)
+
+    with aba_config:
+        st.subheader("Gerenciar Listas do Operador")
+        col_motivo, col_check = st.columns(2)
+        
+        with col_motivo:
+            st.markdown("**🛑 Adicionar Motivo de Parada**")
+            with st.form("form_add_parada"):
+                novo_motivo = st.text_input("Nome do Motivo:")
+                tipo_m = st.selectbox("Aplica-se a:", ["ambos", "carga", "perfuracao"], key="tm")
+                if st.form_submit_button("➕ Adicionar Motivo"):
+                    supabase.table("motivos_parada").insert({"motivo": novo_motivo, "tipo_equipamento": tipo_m}).execute()
+                    st.success("Motivo Adicionado!")
+            
+            st.markdown("Motivos Atuais:")
+            df_motivos = pd.DataFrame(supabase.table("motivos_parada").select("*").execute().data)
+            st.dataframe(df_motivos, hide_index=True)
+
+        with col_check:
+            st.markdown("**📋 Adicionar Item de Checklist**")
+            with st.form("form_add_check"):
+                novo_check = st.text_input("Nome do Item:")
+                tipo_c = st.selectbox("Aplica-se a:", ["ambos", "carga", "perfuracao"], key="tc")
+                if st.form_submit_button("➕ Adicionar Item"):
+                    supabase.table("itens_checklist").insert({"item": novo_check, "tipo_equipamento": tipo_c}).execute()
+                    st.success("Item Adicionado!")
+            
+            st.markdown("Checklist Atual:")
+            df_checks = pd.DataFrame(supabase.table("itens_checklist").select("*").execute().data)
+            st.dataframe(df_checks, hide_index=True)
+
+# ==========================================
+# 4. CONTROLADOR MESTRE DE ROTAS
+# ==========================================
+if st.session_state.perfil is not None:
+    with st.sidebar:
+        st.markdown(f"👤 **{st.session_state.usuario}**")
+        st.markdown(f"🔖 Nível: **{str(st.session_state.perfil).capitalize()}**")
+        st.divider()
+        
+        if st.session_state.perfil == "gestor":
+            if st.button("📊 Painel Gerencial", use_container_width=True):
+                st.session_state.tela_atual = "gestor"
+                st.rerun()
+            if st.button("📱 Simular Operador", use_container_width=True):
+                st.session_state.tela_atual = "selecao_maquina"
+                st.rerun()
+                
+        st.divider()
+        if st.button("🚪 Sair (Logout)", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
+
+if st.session_state.tela_atual == "login":
+    tela_login()
+elif st.session_state.tela_atual == "selecao_maquina":
+    tela_selecao_maquina()
+elif st.session_state.tela_atual == "operacao":
+    tela_operacao()
+elif st.session_state.tela_atual == "gestor" and st.session_state.perfil == "gestor":
+    tela_gestor()
