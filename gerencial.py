@@ -28,8 +28,9 @@ st.markdown(f"""
     .login-title {{ text-align: center; color: {COR_AZUL}; font-weight: 800; font-size: 32px; margin-bottom: 5px; letter-spacing: -1px; }}
     .login-subtitle {{ text-align: center; color: #7f8c8d; font-size: 16px; margin-bottom: 30px; font-weight: 500; }}
     
-    .meta-box {{ background-color: #f0f2f6; padding: 15px; border-radius: 10px; text-align: center; border-left: 5px solid {COR_AZUL}; margin-bottom: 20px; box-shadow: inset 0px 2px 5px rgba(0,0,0,0.05); }}
-    .meta-destaque {{ font-size: 25px; font-weight: bold; color: {COR_AZUL}; display: block; margin-top: 5px;}}
+    .meta-box {{ background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid {COR_AZUL}; margin-bottom: 20px; box-shadow: inset 0px 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-around; text-align: center; }}
+    .meta-titulo {{ font-size: 16px; color: #7f8c8d; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }}
+    .meta-destaque {{ font-size: 28px; font-weight: bold; color: {COR_AZUL}; display: block; margin-top: 5px;}}
     .valor-gigante {{ font-size: 80px; font-weight: 900; text-align: center; color: {COR_AMARELA}; line-height: 120px; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }}
     
     button:has(p:contains("➕")) {{ background: linear-gradient(180deg, #00e676 0%, #00c853 100%) !important; color: white !important; height: 120px !important; border-radius: 25px !important; border: 2px solid #00a042 !important; box-shadow: 0px 8px 15px rgba(0,200,83,0.3) !important; transition: all 0.2s !important; }}
@@ -79,7 +80,7 @@ def obter_horario_sugerido():
     elif 14 <= hora < 15: return "14:00"
     elif 15 <= hora < 16: return "15:00"
     elif 16 <= hora < 17: return "16:00"
-    else: return "07:15" # Padrão se fora de turno para permitir edição retroativa
+    else: return "07:15"
 
 def carregar_dados_gestor():
     df_c = pd.DataFrame(supabase.table("horaria_carga").select("*").execute().data)
@@ -147,11 +148,9 @@ def tela_operacao():
     st.markdown(f"**👤 {st.session_state.usuario}** | **🚜 {st.session_state.tag_equipamento}**")
     
     # ---------------------------------------------------------
-    # NOVO: RELÓGIO HORA A HORA (SELETOR)
+    # RELÓGIO HORA A HORA (SELETOR)
     # ---------------------------------------------------------
     horarios_turno = ["07:15", "08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00"]
-    
-    # Garante que o slot inicial seja o atual se não estiver setado
     if st.session_state.slot_selecionado_estado not in horarios_turno:
         st.session_state.slot_selecionado_estado = obter_horario_sugerido()
     
@@ -160,7 +159,6 @@ def tela_operacao():
     st.markdown("### ⏰ Selecione a Hora do Apontamento")
     slot_atual = st.selectbox("Horário:", horarios_turno, index=idx_padrao)
     
-    # Se o operador mudar a hora, resetamos a pendência de sincronização da hora anterior
     if slot_atual != st.session_state.slot_selecionado_estado:
         st.session_state.slot_selecionado_estado = slot_atual
         st.session_state.sync_pendente = False
@@ -249,10 +247,22 @@ def tela_operacao():
                 st.session_state.prod_val = df_hora.iloc[0][coluna_db]
         
         valor_equipe = sum([df_hora.iloc[0][col] for col in df_hora.columns if 'ut' in col.lower()])
-        st.markdown(f"<div class='meta-box'>Produtividade às {slot_atual}<br>Equipe: <span class='meta-destaque'>{valor_equipe} / {meta_viagens if meta_viagens>0 else 'N/A'} viagens</span></div>", unsafe_allow_html=True)
+        
+        # NOVO BANNER: META vs REALIZADO (Carga)
+        st.markdown(f"""
+            <div class='meta-box'>
+                <div>
+                    <span class='meta-titulo'>META (P)</span>
+                    <span class='meta-destaque'>{meta_viagens if meta_viagens>0 else 'N/A'} viag.</span>
+                </div>
+                <div>
+                    <span class='meta-titulo'>REALIZADO EQUIPE (R)</span>
+                    <span class='meta-destaque'>{valor_equipe} viag.</span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
         c_menos, c_valor, c_mais = st.columns([1, 1.5, 1])
-        
         with c_menos:
             if st.button("➖", key="sub_v", use_container_width=True):
                 st.session_state.prod_val = max(0, int(st.session_state.prod_val) - 1)
@@ -282,7 +292,19 @@ def tela_operacao():
         if not st.session_state.sync_pendente:
             st.session_state.prod_val = res_hora.data[0]['realizado']
             
-        st.markdown(f"<div class='meta-box'>Perfuração às {slot_atual}<br>Meta da Hora: <span class='meta-destaque'>{meta_metros if meta_metros>0 else 'N/A'} metros</span></div>", unsafe_allow_html=True)
+        # NOVO BANNER: META vs REALIZADO (Perfuração)
+        st.markdown(f"""
+            <div class='meta-box'>
+                <div>
+                    <span class='meta-titulo'>META (P)</span>
+                    <span class='meta-destaque'>{meta_metros if meta_metros>0 else 'N/A'} m</span>
+                </div>
+                <div>
+                    <span class='meta-titulo'>REALIZADO (R)</span>
+                    <span class='meta-destaque'>{float(st.session_state.prod_val):.1f} m</span>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
 
         c_menos, c_valor, c_mais = st.columns([1, 1.5, 1])
         with c_menos:
@@ -303,12 +325,48 @@ def tela_operacao():
                 st.rerun()
 
     st.divider()
+
+    # ---------------------------------------------------------
+    # NOVO: TABELA DE RESUMO DO TURNO (P | R | %)
+    # ---------------------------------------------------------
+    st.markdown(f"<h4 style='color:{COR_AZUL};'>📊 Resumo do Turno</h4>", unsafe_allow_html=True)
+    if e_caminhao:
+        res_dia = supabase.table("horaria_carga").select("*").eq("data_id", data_hoje).execute()
+    else:
+        res_dia = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).execute()
+        
+    if res_dia.data:
+        df_dia = pd.DataFrame(res_dia.data)
+        tabela_resumo = []
+        for hora in horarios_turno:
+            linha = df_dia[df_dia['hora'] == hora]
+            if not linha.empty:
+                m_h = linha.iloc[0]['meta']
+                if e_caminhao:
+                    cols_ut = [c for c in linha.columns if 'ut' in c.lower()]
+                    r_h = sum([linha.iloc[0][c] for c in cols_ut])
+                else:
+                    r_h = linha.iloc[0]['realizado']
+                
+                pct = (r_h / m_h * 100) if m_h > 0 else 0
+                tabela_resumo.append({
+                    "Horário": hora,
+                    "P (Meta)": int(m_h) if e_caminhao else float(m_h),
+                    "R (Realizado)": int(r_h) if e_caminhao else float(r_h),
+                    "% Alcance": f"{pct:.0f}%"
+                })
+        
+        if tabela_resumo:
+            st.dataframe(pd.DataFrame(tabela_resumo), use_container_width=True, hide_index=True)
+        else:
+            st.write("Sem registros no turno de hoje.")
+
+    st.write("---")
     
     # ---------------------------------------------------------
     # FECHAMENTO DO TURNO (Parte Diária)
     # ---------------------------------------------------------
-    st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>📝 Fechar Turno</h3>", unsafe_allow_html=True)
-    with st.expander("Preencher Relatório Diário", expanded=False):
+    with st.expander("📝 Preencher Relatório Diário", expanded=False):
         with st.form("form_parte_diaria"):
             col_h1, col_h2 = st.columns(2)
             h_inicial = col_h1.number_input("Horímetro Inicial:", min_value=0.0, step=0.1, format="%.1f")
