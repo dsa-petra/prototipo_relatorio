@@ -26,5 +26,5 @@ jobs:
           SUPABASE_URL: ${{ https://sfvbwgmwyrfsnmehsjbt.supabase.co }}
           SUPABASE_KEY: ${{ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmdmJ3Z213eXJmc25tZWhzamJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTIxMzcsImV4cCI6MjEwODY4ODEzN30.7o4pfXEAjBLuzJ598djf-VsdZ7-qj0fvePOn369REPM }}
           TELEGRAM_TOKEN: ${{ 8899033416:AAGI9SlCihqnF95x-hRDhsHQ6YKrFYNRpBo }}
-          TELEGRAM_CHAT_ID: ${{ -5093522724 }}
+          TELEGRAM_CHAT_ID: ${{ -1005093522724 }}
         run: python notificador.py
