@@ -42,6 +42,8 @@ st.markdown(f"""
     .dir-card {{ background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid {COR_AZUL}; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
     .dir-titulo {{ font-size: 14px; color: #6c757d; font-weight: bold; text-transform: uppercase; }}
     .dir-valor {{ font-size: 24px; font-weight: 900; color: {COR_AZUL}; margin-top: 5px; }}
+    
+    .linha-total {{ background-color: #334155; padding: 12px 20px; border-radius: 5px; color: #ffc107; font-weight: bold; display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 16px; border-left: 5px solid #ffc107; }}
     </style>
 """, unsafe_allow_html=True)
 
@@ -94,7 +96,6 @@ def carregar_dados_gestor():
     df_rp = pd.DataFrame(supabase.table("registros_parciais").select("*").execute().data)
     df_os = pd.DataFrame(supabase.table("ordens_servico").select("*").execute().data)
     
-    # FORÇAR CONVERSÃO DE DATAS PARA STRING PARA EVITAR BUGS DE FILTRO DO PANDAS
     if not df_c.empty and 'data_id' in df_c.columns: df_c['data_id'] = df_c['data_id'].astype(str)
     if not df_p.empty and 'data_id' in df_p.columns: df_p['data_id'] = df_p['data_id'].astype(str)
     if not df_pt.empty and 'data' in df_pt.columns: df_pt['data'] = df_pt['data'].astype(str)
@@ -102,11 +103,6 @@ def carregar_dados_gestor():
     if not df_os.empty and 'data_abertura' in df_os.columns: df_os['data_abertura'] = df_os['data_abertura'].astype(str)
     
     return df_c, df_p, df_pt, df_rp, df_os
-
-def destacar_linha_total(row):
-    if row['HORA'] == 'TOTAL':
-        return ['background-color: #334155; font-weight: bold; color: #ffc107'] * len(row)
-    return [''] * len(row)
 
 # ==========================================
 # 3. TELAS DO SISTEMA
@@ -326,8 +322,6 @@ def tela_operacao():
         if not df_op_carga.empty:
             caminhoes_op = [col.upper() for col in df_op_carga.columns if 'ut' in col.lower() and df_op_carga[col].sum() > 0]
             tabela_excel = []
-            totais_dict = {cam: 0 for cam in caminhoes_op}
-            totais_dict["REALIZADO"] = 0; totais_dict["PLANEJADO"] = 0
             
             for hora in HORARIOS_TURNO:
                 linha = df_op_carga[df_op_carga['hora'] == hora]
@@ -338,24 +332,14 @@ def tela_operacao():
                     val_c = linha.iloc[0][cam.lower()] if not linha.empty and cam.lower() in linha.columns else 0
                     linha_dados[cam] = val_c
                     realizado_h += val_c
-                    totais_dict[cam] += val_c
                 
                 meta = linha.iloc[0]['meta'] if not linha.empty else 0
                 linha_dados["REALIZADO"] = realizado_h
                 linha_dados["PLANEJADO"] = meta
                 linha_dados["% DESEMPENHO"] = f"{(realizado_h / meta * 100):.0f}%" if meta > 0 else "0%"
-                
                 tabela_excel.append(linha_dados)
-                totais_dict["REALIZADO"] += realizado_h
-                totais_dict["PLANEJADO"] += meta
             
-            linha_total = {"HORA": "TOTAL"}
-            for cam in caminhoes_op: linha_total[cam] = totais_dict[cam]
-            linha_total["REALIZADO"] = totais_dict["REALIZADO"]; linha_total["PLANEJADO"] = totais_dict["PLANEJADO"]
-            linha_total["% DESEMPENHO"] = f"{(totais_dict['REALIZADO'] / totais_dict['PLANEJADO'] * 100):.0f}%" if totais_dict["PLANEJADO"] > 0 else "0%"
-            tabela_excel.append(linha_total)
-            
-            st.dataframe(pd.DataFrame(tabela_excel).style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(tabela_excel), use_container_width=True, hide_index=True)
         else:
             st.info("Ainda não existem registos de carga para o dia de hoje.")
             
@@ -365,7 +349,6 @@ def tela_operacao():
         
         if not df_op_perf.empty:
             tabela_perf = []
-            totais_p = {"REALIZADO": 0.0, "PLANEJADO": 0.0}
             
             for hora in HORARIOS_TURNO:
                 linha = df_op_perf[df_op_perf['hora'] == hora]
@@ -378,18 +361,8 @@ def tela_operacao():
                     "PLANEJADO": f"{meta_p:.1f}", 
                     "% DESEMPENHO": f"{(realizado_p / meta_p * 100):.0f}%" if meta_p > 0 else "0%"
                 })
-                totais_p["REALIZADO"] += realizado_p
-                totais_p["PLANEJADO"] += meta_p
             
-            tabela_perf.append({
-                "HORA": "TOTAL", 
-                "REALIZADO": f"{totais_p['REALIZADO']:.1f}", 
-                "PLANEJADO": f"{totais_p['PLANEJADO']:.1f}", 
-                "% DESEMPENHO": f"{(totais_p['REALIZADO'] / totais_p['PLANEJADO'] * 100):.0f}%" if totais_p["PLANEJADO"] > 0 else "0%"
-            })
-            
-            df_ex_p = pd.DataFrame(tabela_perf)
-            st.dataframe(df_ex_p.style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(tabela_perf), use_container_width=True, hide_index=True)
         else:
             st.info("Ainda não existem registos de perfuração para o dia de hoje.")
 
@@ -453,110 +426,117 @@ def tela_gestor():
         dia_alvo = st.date_input("📅 Selecionar Data:", datetime.today(), format="DD/MM/YYYY")
         dia_alvo_str = dia_alvo.strftime("%Y-%m-%d")
         
-        with st.expander("⚙️ Ajustar Horários e Metas (Planejado)", expanded=False):
-            with st.form("form_edit_metas"):
-                st.write(f"Atualize o planejamento para uma hora específica do dia **{dia_alvo.strftime('%d/%m/%Y')}**:")
-                c_edit1, c_edit2, c_edit3 = st.columns(3)
-                
-                opcoes_edit = [INTERVALOS[h] for h in HORARIOS_TURNO]
-                intervalo_edit = c_edit1.selectbox("Período:", opcoes_edit)
-                hora_edit = HORARIOS_TURNO[opcoes_edit.index(intervalo_edit)]
-                
-                linha_c_edit = df_carga[(df_carga['data_id'] == dia_alvo_str) & (df_carga['hora'] == hora_edit)] if not df_carga.empty else pd.DataFrame()
-                linha_p_edit = df_perf[(df_perf['data_id'] == dia_alvo_str) & (df_perf['hora'] == hora_edit)] if not df_perf.empty else pd.DataFrame()
-                
-                meta_v_atual = int(linha_c_edit.iloc[0]['meta']) if not linha_c_edit.empty else 0
-                meta_m_atual = float(linha_p_edit.iloc[0]['meta']) if not linha_p_edit.empty else 0.0
-                
-                nova_meta_v = c_edit2.number_input("Meta Carga (Viagens):", value=meta_v_atual, step=1)
-                nova_meta_m = c_edit3.number_input("Meta Perfuração (Metros):", value=meta_m_atual, step=1.0)
-                
-                if st.form_submit_button("💾 Salvar Ajustes"):
-                    if linha_c_edit.empty:
-                        supabase.table("horaria_carga").insert({"data_id": dia_alvo_str, "hora": hora_edit, "meta": nova_meta_v, "ut33": 0, "ut34": 0, "causa": ""}).execute()
-                    else:
-                        supabase.table("horaria_carga").update({"meta": nova_meta_v}).eq("data_id", dia_alvo_str).eq("hora", hora_edit).execute()
-                        
-                    if linha_p_edit.empty:
-                        supabase.table("horaria_perf").insert({"data_id": dia_alvo_str, "hora": hora_edit, "meta": nova_meta_m, "realizado": 0.0, "causa": ""}).execute()
-                    else:
-                        supabase.table("horaria_perf").update({"meta": nova_meta_m}).eq("data_id", dia_alvo_str).eq("hora", hora_edit).execute()
-                        
-                    st.success("Metas atualizadas com sucesso!"); time.sleep(1); st.rerun()
-        
-        st.write("---")
-
+        # ==========================
+        # TABELA DE CARGA (EDITÁVEL)
+        # ==========================
         st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>🚜 Operação de Carga - {dia_alvo.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
         df_carga_alvo = df_carga[df_carga['data_id'] == dia_alvo_str] if not df_carga.empty else pd.DataFrame()
         
-        if not df_carga_alvo.empty:
-            caminhoes_op = [col.upper() for col in df_carga_alvo.columns if 'ut' in col.lower() and df_carga_alvo[col].sum() > 0]
-            tabela_excel = []
-            totais_dict = {cam: 0 for cam in caminhoes_op}
-            totais_dict["REALIZADO"] = 0; totais_dict["PLANEJADO"] = 0
+        caminhoes_op = [col.upper() for col in df_carga_alvo.columns if 'ut' in col.lower() and df_carga_alvo[col].sum() > 0] if not df_carga_alvo.empty else []
+        tabela_excel = []
+        
+        for hora in HORARIOS_TURNO:
+            linha = df_carga_alvo[df_carga_alvo['hora'] == hora] if not df_carga_alvo.empty else pd.DataFrame()
+            linha_dados = {"HORA": INTERVALOS[hora]}
             
-            for hora in HORARIOS_TURNO:
-                linha = df_carga_alvo[df_carga_alvo['hora'] == hora]
-                linha_dados = {"HORA": INTERVALOS[hora]}
-                
-                realizado_h = 0
-                for cam in caminhoes_op:
-                    val_c = linha.iloc[0][cam.lower()] if not linha.empty and cam.lower() in linha.columns else 0
-                    linha_dados[cam] = val_c
-                    realizado_h += val_c
-                    totais_dict[cam] += val_c
-                
-                meta = linha.iloc[0]['meta'] if not linha.empty else 0
-                linha_dados["REALIZADO"] = realizado_h
-                linha_dados["PLANEJADO"] = meta
-                linha_dados["% DESEMPENHO"] = f"{(realizado_h / meta * 100):.0f}%" if meta > 0 else "0%"
-                
-                tabela_excel.append(linha_dados)
-                totais_dict["REALIZADO"] += realizado_h
-                totais_dict["PLANEJADO"] += meta
+            realizado_h = 0
+            for cam in caminhoes_op:
+                val_c = int(linha.iloc[0][cam.lower()]) if not linha.empty and cam.lower() in linha.columns else 0
+                linha_dados[cam] = val_c
+                realizado_h += val_c
             
-            linha_total = {"HORA": "TOTAL"}
-            for cam in caminhoes_op: linha_total[cam] = totais_dict[cam]
-            linha_total["REALIZADO"] = totais_dict["REALIZADO"]; linha_total["PLANEJADO"] = totais_dict["PLANEJADO"]
-            linha_total["% DESEMPENHO"] = f"{(totais_dict['REALIZADO'] / totais_dict['PLANEJADO'] * 100):.0f}%" if totais_dict["PLANEJADO"] > 0 else "0%"
-            tabela_excel.append(linha_total)
-            
-            st.dataframe(pd.DataFrame(tabela_excel).style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
-        else: st.warning("Sem dados de produção (carga) para o dia selecionado.")
+            meta = int(linha.iloc[0]['meta']) if not linha.empty else 0
+            linha_dados["REALIZADO"] = realizado_h
+            linha_dados["PLANEJADO"] = meta
+            linha_dados["% DESEMPENHO"] = f"{(realizado_h / meta * 100):.0f}%" if meta > 0 else "0%"
+            tabela_excel.append(linha_dados)
+        
+        df_ex = pd.DataFrame(tabela_excel)
+        
+        st.markdown("💡 *Clique 2x na coluna **PLANEJADO** para editar as metas por hora.*")
+        colunas_bloqueadas = [c for c in df_ex.columns if c != "PLANEJADO"]
+        
+        df_editado_carga = st.data_editor(
+            df_ex,
+            use_container_width=True,
+            hide_index=True,
+            disabled=colunas_bloqueadas
+        )
+        
+        # Totalizador Dinâmico (Fora da tabela para não quebrar a edição)
+        tot_r = int(df_editado_carga["REALIZADO"].sum())
+        tot_p = int(df_editado_carga["PLANEJADO"].sum())
+        pct_t = f"{(tot_r / tot_p * 100):.0f}%" if tot_p > 0 else "0%"
+        
+        st.markdown(f"<div class='linha-total'><span>TOTAL CARGA</span><span>REALIZADO: {tot_r}</span><span>PLANEJADO: {tot_p}</span><span>DESEMPENHO: {pct_t}</span></div>", unsafe_allow_html=True)
+        
+        if st.button("💾 Gravar Novas Metas de Carga", type="primary", use_container_width=True):
+            for i, row in df_editado_carga.iterrows():
+                hora_base = row['HORA'].split(" - ")[0]
+                nova_meta = int(row['PLANEJADO'])
+                
+                linha_existente = df_carga_alvo[df_carga_alvo['hora'] == hora_base] if not df_carga_alvo.empty else pd.DataFrame()
+                if linha_existente.empty:
+                    supabase.table("horaria_carga").insert({"data_id": dia_alvo_str, "hora": hora_base, "meta": nova_meta, "ut33": 0, "ut34": 0, "causa": ""}).execute()
+                else:
+                    supabase.table("horaria_carga").update({"meta": nova_meta}).eq("data_id", dia_alvo_str).eq("hora", hora_base).execute()
+            st.success("Metas de Carga atualizadas na nuvem!")
+            time.sleep(1); st.rerun()
             
         st.write("---")
         
+        # ==========================
+        # TABELA DE PERFURAÇÃO (EDITÁVEL)
+        # ==========================
         st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>🎯 Operação de Perfuração - {dia_alvo.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
         df_perf_alvo = df_perf[df_perf['data_id'] == dia_alvo_str] if not df_perf.empty else pd.DataFrame()
         
-        if not df_perf_alvo.empty:
-            tabela_perf = []
-            totais_p = {"REALIZADO": 0.0, "PLANEJADO": 0.0}
-            
-            for hora in HORARIOS_TURNO:
-                linha = df_perf_alvo[df_perf_alvo['hora'] == hora]
-                realizado_p = float(linha.iloc[0]['realizado']) if not linha.empty else 0.0
-                meta_p = float(linha.iloc[0]['meta']) if not linha.empty else 0.0
-                
-                tabela_perf.append({
-                    "HORA": INTERVALOS[hora], 
-                    "REALIZADO": f"{realizado_p:.1f}", 
-                    "PLANEJADO": f"{meta_p:.1f}", 
-                    "% DESEMPENHO": f"{(realizado_p / meta_p * 100):.0f}%" if meta_p > 0 else "0%"
-                })
-                totais_p["REALIZADO"] += realizado_p
-                totais_p["PLANEJADO"] += meta_p
+        tabela_perf = []
+        for hora in HORARIOS_TURNO:
+            linha = df_perf_alvo[df_perf_alvo['hora'] == hora] if not df_perf_alvo.empty else pd.DataFrame()
+            realizado_p = float(linha.iloc[0]['realizado']) if not linha.empty else 0.0
+            meta_p = float(linha.iloc[0]['meta']) if not linha.empty else 0.0
             
             tabela_perf.append({
-                "HORA": "TOTAL", 
-                "REALIZADO": f"{totais_p['REALIZADO']:.1f}", 
-                "PLANEJADO": f"{totais_p['PLANEJADO']:.1f}", 
-                "% DESEMPENHO": f"{(totais_p['REALIZADO'] / totais_p['PLANEJADO'] * 100):.0f}%" if totais_p["PLANEJADO"] > 0 else "0%"
+                "HORA": INTERVALOS[hora], 
+                "REALIZADO": realizado_p, 
+                "PLANEJADO": meta_p, 
+                "% DESEMPENHO": f"{(realizado_p / meta_p * 100):.0f}%" if meta_p > 0 else "0%"
             })
-            
-            df_ex_p = pd.DataFrame(tabela_perf)
-            st.dataframe(df_ex_p.style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
-        else: st.warning("Sem dados de perfuração para o dia selecionado.")
+        
+        df_ex_p = pd.DataFrame(tabela_perf)
+        
+        st.markdown("💡 *Clique 2x na coluna **PLANEJADO** para editar as metas por hora.*")
+        
+        df_editado_perf = st.data_editor(
+            df_ex_p,
+            use_container_width=True,
+            hide_index=True,
+            disabled=["HORA", "REALIZADO", "% DESEMPENHO"],
+            column_config={
+                "REALIZADO": st.column_config.NumberColumn(format="%.1f m"),
+                "PLANEJADO": st.column_config.NumberColumn(format="%.1f")
+            }
+        )
+        
+        tot_r_p = float(df_editado_perf["REALIZADO"].sum())
+        tot_p_p = float(df_editado_perf["PLANEJADO"].sum())
+        pct_t_p = f"{(tot_r_p / tot_p_p * 100):.0f}%" if tot_p_p > 0 else "0%"
+        
+        st.markdown(f"<div class='linha-total'><span>TOTAL PERFURAÇÃO</span><span>REALIZADO: {tot_r_p:.1f}</span><span>PLANEJADO: {tot_p_p:.1f}</span><span>DESEMPENHO: {pct_t_p}</span></div>", unsafe_allow_html=True)
+
+        if st.button("💾 Gravar Novas Metas de Perfuração", type="primary", use_container_width=True):
+            for i, row in df_editado_perf.iterrows():
+                hora_base = row['HORA'].split(" - ")[0]
+                nova_meta = float(row['PLANEJADO'])
+                
+                linha_existente = df_perf_alvo[df_perf_alvo['hora'] == hora_base] if not df_perf_alvo.empty else pd.DataFrame()
+                if linha_existente.empty:
+                    supabase.table("horaria_perf").insert({"data_id": dia_alvo_str, "hora": hora_base, "meta": nova_meta, "realizado": 0.0, "causa": ""}).execute()
+                else:
+                    supabase.table("horaria_perf").update({"meta": nova_meta}).eq("data_id", dia_alvo_str).eq("hora", hora_base).execute()
+            st.success("Metas de Perfuração atualizadas na nuvem!")
+            time.sleep(1); st.rerun()
 
     with aba_manutencao:
         st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>🔧 Central de Ordens de Serviço (OS)</h3>", unsafe_allow_html=True)
