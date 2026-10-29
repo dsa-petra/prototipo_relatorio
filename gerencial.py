@@ -23,43 +23,23 @@ st.markdown(f"""
     .kpi-card {{ background-color: {COR_AZUL}; color: white; padding: 20px; border-radius: 10px; text-align: center; border-left: 5px solid {COR_AMARELA}; box-shadow: 2px 2px 5px rgba(0,0,0,0.1); }}
     .kpi-title {{ font-size: 1.1rem; margin-bottom: 5px; opacity: 0.9; }}
     .kpi-value {{ font-size: 2.5rem; font-weight: bold; color: {COR_AMARELA}; margin: 0; }}
-    .kpi-sub {{ font-size: 1rem; color: #e0e0e0; }}
-    .cal-header {{ font-weight: bold; text-align: center; color: {COR_AZUL}; background-color: #f0f2f6; padding: 5px; border-radius: 5px; }}
     
     .login-box {{ background: linear-gradient(135deg, #ffffff 0%, #f4f6f9 100%); padding: 50px 30px; border-radius: 20px; box-shadow: 0px 20px 40px rgba(0,0,0,0.08); border-top: 8px solid {COR_AZUL}; margin-top: 50px; }}
     .login-title {{ text-align: center; color: {COR_AZUL}; font-weight: 800; font-size: 32px; margin-bottom: 5px; letter-spacing: -1px; }}
-    .login-subtitle {{ text-align: center; color: #7f8c8d; font-size: 16px; margin-bottom: 30px; font-weight: 500; }}
     
     .meta-box {{ background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid {COR_AZUL}; margin-bottom: 20px; box-shadow: inset 0px 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-around; text-align: center; }}
     .meta-titulo {{ font-size: 16px; color: #7f8c8d; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }}
     .meta-destaque {{ font-size: 28px; font-weight: bold; color: {COR_AZUL}; display: block; margin-top: 5px;}}
     
-    /* Botões Gigantes Customizados (+ e -) */
-    button:has(p:contains("➕")) {{ background: linear-gradient(180deg, #00e676 0%, #00c853 100%) !important; color: white !important; height: 120px !important; border-radius: 25px !important; border: 2px solid #00a042 !important; box-shadow: 0px 8px 15px rgba(0,200,83,0.3) !important; transition: all 0.2s !important; }}
+    button:has(p:contains("➕")) {{ background: linear-gradient(180deg, #00e676 0%, #00c853 100%) !important; color: white !important; height: 100px !important; border-radius: 25px !important; border: 2px solid #00a042 !important; box-shadow: 0px 8px 15px rgba(0,200,83,0.3) !important; transition: all 0.2s !important; }}
     button:has(p:contains("➕")):active {{ transform: translateY(4px) !important; box-shadow: 0px 4px 10px rgba(0,200,83,0.3) !important; }}
-    button:has(p:contains("➕")) p {{ font-size: 60px !important; font-weight: bold; margin: 0; }}
+    button:has(p:contains("➕")) p {{ font-size: 50px !important; font-weight: bold; margin: 0; }}
     
-    button:has(p:contains("➖")) {{ background: linear-gradient(180deg, #ff5252 0%, #ff1744 100%) !important; color: white !important; height: 120px !important; border-radius: 25px !important; border: 2px solid #d50000 !important; box-shadow: 0px 8px 15px rgba(255,23,68,0.3) !important; transition: all 0.2s !important; }}
+    button:has(p:contains("➖")) {{ background: linear-gradient(180deg, #ff5252 0%, #ff1744 100%) !important; color: white !important; height: 100px !important; border-radius: 25px !important; border: 2px solid #d50000 !important; box-shadow: 0px 8px 15px rgba(255,23,68,0.3) !important; transition: all 0.2s !important; }}
     button:has(p:contains("➖")):active {{ transform: translateY(4px) !important; box-shadow: 0px 4px 10px rgba(255,23,68,0.3) !important; }}
-    button:has(p:contains("➖")) p {{ font-size: 60px !important; font-weight: bold; margin: 0; line-height: 50px; }}
+    button:has(p:contains("➖")) p {{ font-size: 50px !important; font-weight: bold; margin: 0; line-height: 50px; }}
     
-    /* Novo Input Numérico Gigante */
-    div[data-testid="stNumberInput"] input[type="number"] {{
-        font-size: 70px !important;
-        font-weight: 900 !important;
-        text-align: center !important;
-        color: {COR_AMARELA} !important;
-        height: 120px !important;
-        border-radius: 20px !important;
-        background-color: #1e1e1e !important;
-        border: 3px solid {COR_AZUL} !important;
-        box-shadow: inset 0px 4px 10px rgba(0,0,0,0.2) !important;
-    }}
-    /* Esconder as setinhas padrão do input de número */
-    div[data-testid="stNumberInput"] input[type="number"]::-webkit-inner-spin-button, 
-    div[data-testid="stNumberInput"] input[type="number"]::-webkit-outer-spin-button {{
-        -webkit-appearance: none; margin: 0;
-    }}
+    .entrada-valor {{ font-size: 60px; font-weight: 900; text-align: center; color: {COR_AMARELA}; background-color: #1e1e1e; border: 3px solid {COR_AZUL}; border-radius: 15px; padding: 10px; display: block; width: 100%; margin: 10px 0; }}
     
     .dir-card {{ background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid {COR_AZUL}; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
     .dir-titulo {{ font-size: 14px; color: #6c757d; font-weight: bold; text-transform: uppercase; }}
@@ -86,11 +66,14 @@ if "tela_atual" not in st.session_state: st.session_state.tela_atual = "login"
 if "tag_equipamento" not in st.session_state: st.session_state.tag_equipamento = None
 if "tipo_equipamento" not in st.session_state: st.session_state.tipo_equipamento = None
 if "slot_selecionado_estado" not in st.session_state: st.session_state.slot_selecionado_estado = None
-
-# Nova variável para a entrada manual de dados (zera após envio)
 if "incremento_val" not in st.session_state: st.session_state.incremento_val = 0
 
 HORARIOS_TURNO = ["06:15", "07:00", "08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00"]
+INTERVALOS = {
+    "06:15": "06:15 - 07:00", "07:00": "07:00 - 08:00", "08:00": "08:00 - 09:00", 
+    "09:00": "09:00 - 10:00", "10:00": "10:00 - 11:00", "11:00": "11:00 - 12:00", 
+    "13:00": "13:00 - 14:00", "14:00": "14:00 - 15:00", "15:00": "15:00 - 16:00"
+}
 
 def obter_horario_sugerido():
     agora = datetime.now()
@@ -124,7 +107,6 @@ def tela_login():
         st.markdown("<div class='login-box'>", unsafe_allow_html=True)
         st.image("https://via.placeholder.com/600x150.png?text=PETRA+AGREGADOS", use_container_width=True)
         st.markdown("<div class='login-title'>FMS Petra</div>", unsafe_allow_html=True)
-        st.markdown("<div class='login-subtitle'>Gestão de Frota e Planejamento de Lavra</div>", unsafe_allow_html=True)
         
         with st.form("form_login"):
             usuario = st.text_input("👤 Nome de Usuário:")
@@ -158,7 +140,7 @@ def tela_selecao_maquina():
                     st.session_state.tipo_equipamento = df_eq[df_eq["tag"] == tag_selecionada].iloc[0]["tipo"]
                     st.session_state.tela_atual = "operacao"
                     st.session_state.slot_selecionado_estado = obter_horario_sugerido()
-                    st.session_state.incremento_val = 0 # Zera ao iniciar a máquina
+                    st.session_state.incremento_val = 0 
                     st.rerun()
             else:
                 st.warning("Nenhum equipamento cadastrado.")
@@ -172,12 +154,18 @@ def tela_operacao():
     if st.session_state.slot_selecionado_estado not in HORARIOS_TURNO:
         st.session_state.slot_selecionado_estado = obter_horario_sugerido()
     
-    st.markdown("### ⏰ Selecione a Hora do Apontamento")
-    slot_atual = st.selectbox("Horário:", HORARIOS_TURNO, index=HORARIOS_TURNO.index(st.session_state.slot_selecionado_estado))
+    st.markdown("### ⏰ Selecione o Período do Apontamento")
+    
+    # Exibir os intervalos no seletor, mas o valor real é a hora base
+    opcoes_intervalos = [INTERVALOS[h] for h in HORARIOS_TURNO]
+    idx_atual = HORARIOS_TURNO.index(st.session_state.slot_selecionado_estado)
+    
+    intervalo_selecionado = st.selectbox("Período:", opcoes_intervalos, index=idx_atual)
+    slot_atual = HORARIOS_TURNO[opcoes_intervalos.index(intervalo_selecionado)]
     
     if slot_atual != st.session_state.slot_selecionado_estado:
         st.session_state.slot_selecionado_estado = slot_atual
-        st.session_state.incremento_val = 0 # Zera a caixa se mudar de hora
+        st.session_state.incremento_val = 0
         st.rerun()
 
     # Botoes Superiores
@@ -218,7 +206,7 @@ def tela_operacao():
 
     st.write("---")
 
-    # Tela Apontamento (Lógica Incremental)
+    # Tela Apontamento
     res_pcp = supabase.table("pcp_planejamento").select("*").eq("data", data_hoje).execute()
     meta_viagens = res_pcp.data[0]['meta_viagens_equipe_hora'] if res_pcp.data else 0
     meta_metros = res_pcp.data[0]['meta_perf_metros_hora'] if res_pcp.data else 0.0
@@ -231,79 +219,75 @@ def tela_operacao():
             res_hora = supabase.table("horaria_carga").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
         
         df_hora = pd.DataFrame(res_hora.data)
-        
-        # Leitura do valor consolidado no banco (para mostrar no banner)
         valor_db_atual = int(df_hora.iloc[0][coluna_db]) if coluna_db in df_hora.columns else 0
         valor_equipe_atual = sum([df_hora.iloc[0][col] for col in df_hora.columns if 'ut' in col.lower()])
         
         st.markdown(f"<div class='meta-box'><div><span class='meta-titulo'>META DA HORA (P)</span><span class='meta-destaque'>{meta_viagens if meta_viagens>0 else 'N/A'} viag.</span></div><div><span class='meta-titulo'>REALIZADO EQUIPE (R)</span><span class='meta-destaque'>{valor_equipe_atual} viag.</span></div></div>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#7f8c8d; font-weight:bold; margin-bottom:-5px;'>Lançamento Manual (Viagens):</p>", unsafe_allow_html=True)
         
-        st.markdown("<p style='text-align:center; color:#7f8c8d; margin-bottom:-10px;'>Novas Viagens a Lançar:</p>", unsafe_allow_html=True)
-        
-        c_menos, c_valor, c_mais = st.columns([1, 1.5, 1])
+        c_menos, c_valor, c_mais = st.columns([1, 2, 1])
         with c_menos:
             if st.button("➖", key="sub_v", use_container_width=True):
                 st.session_state.incremento_val = max(0, int(st.session_state.incremento_val) - 1)
                 st.rerun()
         with c_valor:
-            st.session_state.incremento_val = st.number_input("Lancamento", value=int(st.session_state.incremento_val), step=1, format="%d", label_visibility="collapsed")
+            val_input = st.number_input("Lancamento", value=int(st.session_state.incremento_val), step=1, format="%d", label_visibility="collapsed")
+            if val_input != st.session_state.incremento_val: st.session_state.incremento_val = val_input
         with c_mais:
             if st.button("➕", key="add_v", use_container_width=True):
                 st.session_state.incremento_val = int(st.session_state.incremento_val) + 1
                 st.rerun()
                 
         st.write("")
-        if st.button("🚀 Lançar Apontamento", use_container_width=True, type="primary"):
+        if st.button("🚀 Lançar Apontamento e Zerar", use_container_width=True, type="primary"):
             if st.session_state.incremento_val > 0:
                 novo_valor = valor_db_atual + st.session_state.incremento_val
                 supabase.table("horaria_carga").update({coluna_db: novo_valor}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-                st.session_state.incremento_val = 0 # Zera para a próxima
-                st.success("✔️ Apontamento registado no banco de dados!")
+                st.session_state.incremento_val = 0 
+                st.success("✔️ Salvo!")
                 time.sleep(1)
                 st.rerun()
             else:
-                st.warning("O valor a lançar deve ser maior que zero.")
+                st.warning("O valor deve ser maior que zero.")
             
-    else: # Perfuração
+    else: 
         res_hora = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
         if not res_hora.data:
             supabase.table("horaria_perf").insert({"data_id": data_hoje, "hora": slot_atual, "realizado": 0.0, "meta": meta_metros, "causa": ""}).execute()
             res_hora = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
 
-        # Leitura do valor consolidado no banco
         valor_db_atual = float(res_hora.data[0]['realizado'])
             
         st.markdown(f"<div class='meta-box'><div><span class='meta-titulo'>META DA HORA (P)</span><span class='meta-destaque'>{meta_metros if meta_metros>0 else 'N/A'} m</span></div><div><span class='meta-titulo'>REALIZADO ACUMULADO (R)</span><span class='meta-destaque'>{valor_db_atual:.1f} m</span></div></div>", unsafe_allow_html=True)
-        
-        st.markdown("<p style='text-align:center; color:#7f8c8d; margin-bottom:-10px;'>Novos Metros a Lançar:</p>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center; color:#7f8c8d; font-weight:bold; margin-bottom:-5px;'>Lançamento Manual (Metros):</p>", unsafe_allow_html=True)
 
-        c_menos, c_valor, c_mais = st.columns([1, 1.5, 1])
+        c_menos, c_valor, c_mais = st.columns([1, 2, 1])
         with c_menos:
             if st.button("➖", key="sub_p", use_container_width=True):
                 st.session_state.incremento_val = max(0.0, float(st.session_state.incremento_val) - 1.0)
                 st.rerun()
         with c_valor:
-            st.session_state.incremento_val = st.number_input("Lancamento", value=float(st.session_state.incremento_val), step=1.0, format="%.1f", label_visibility="collapsed")
+            val_input = st.number_input("Lancamento", value=float(st.session_state.incremento_val), step=1.0, format="%.1f", label_visibility="collapsed")
+            if val_input != st.session_state.incremento_val: st.session_state.incremento_val = val_input
         with c_mais:
             if st.button("➕", key="add_p", use_container_width=True):
                 st.session_state.incremento_val = float(st.session_state.incremento_val) + 1.0
                 st.rerun()
                 
         st.write("")
-        if st.button("🚀 Lançar Apontamento", use_container_width=True, type="primary"):
+        if st.button("🚀 Lançar Apontamento e Zerar", use_container_width=True, type="primary"):
             if st.session_state.incremento_val > 0:
                 novo_valor = valor_db_atual + st.session_state.incremento_val
                 supabase.table("horaria_perf").update({"realizado": novo_valor}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-                st.session_state.incremento_val = 0 # Zera para a próxima
-                st.success("✔️ Apontamento registado no banco de dados!")
+                st.session_state.incremento_val = 0 
+                st.success("✔️ Salvo!")
                 time.sleep(1)
                 st.rerun()
             else:
-                st.warning("O valor a lançar deve ser maior que zero.")
+                st.warning("O valor deve ser maior que zero.")
 
     st.write("---")
     
-    # Fechamento Turno
     with st.expander("📝 Preencher Relatório Diário (Fechamento)", expanded=False):
         with st.form("form_parte_diaria"):
             col_hm1, col_hm2 = st.columns(2)
@@ -361,41 +345,62 @@ def tela_gestor():
     aba_pcp, aba_diretoria, aba_dados, aba_config = st.tabs(["📋 Acompanhamento Diário", "📊 Visão Diretoria", "🗄️ Dados Brutos", "🛠️ Cadastros"])
 
     with aba_pcp:
-        st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>Acompanhamento Diário de Produção</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>Detalhe Produção - {datetime.today().strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
         dia_alvo = st.date_input("Selecionar Data:", datetime.today())
         dia_alvo_str = dia_alvo.strftime("%Y-%m-%d")
         
         df_carga_alvo = df_carga[df_carga['data_id'] == dia_alvo_str] if not df_carga.empty else pd.DataFrame()
         
         if not df_carga_alvo.empty:
+            # Descobrir quais caminhões operaram (tiveram algum valor > 0)
+            caminhoes_op = []
+            for col in df_carga_alvo.columns:
+                if 'ut' in col.lower() and df_carga_alvo[col].sum() > 0:
+                    caminhoes_op.append(col.upper())
+            
             tabela_excel = []
-            totais = {"ut33": 0, "ut34": 0, "r_hora": 0, "m_hora": 0}
+            totais_dict = {cam: 0 for cam in caminhoes_op}
+            totais_dict["SOMA REALIZADA"] = 0
+            totais_dict["SOMA PLANEJ."] = 0
             
             for hora in HORARIOS_TURNO:
                 linha = df_carga_alvo[df_carga_alvo['hora'] == hora]
-                v_ut33 = linha.iloc[0]['ut33'] if not linha.empty and 'ut33' in linha.columns else 0
-                v_ut34 = linha.iloc[0]['ut34'] if not linha.empty and 'ut34' in linha.columns else 0
+                linha_dados = {"HORA": INTERVALOS[hora]}
+                
+                realizado_h = 0
+                for cam in caminhoes_op:
+                    val_c = linha.iloc[0][cam.lower()] if not linha.empty and cam.lower() in linha.columns else 0
+                    linha_dados[cam] = val_c
+                    realizado_h += val_c
+                    totais_dict[cam] += val_c
+                
                 meta = linha.iloc[0]['meta'] if not linha.empty else 0
-                causa = linha.iloc[0]['causa'] if not linha.empty else ""
                 
-                realizado_h = v_ut33 + v_ut34
+                linha_dados["SOMA REALIZADA"] = realizado_h
+                linha_dados["SOMA PLANEJ."] = meta
+                
                 pct = f"{(realizado_h / meta * 100):.0f}%" if meta > 0 else "0%"
+                linha_dados["% DESEMPENHO"] = pct
                 
-                tabela_excel.append({
-                    "HORARIO": hora, "UT-33": v_ut33, "UT-34": v_ut34, 
-                    "Realizado Hora": realizado_h, "Meta Hora": meta, "%": pct, "Causas": causa
-                })
-                totais["ut33"] += v_ut33; totais["ut34"] += v_ut34; totais["r_hora"] += realizado_h; totais["m_hora"] += meta
+                tabela_excel.append(linha_dados)
+                
+                totais_dict["SOMA REALIZADA"] += realizado_h
+                totais_dict["SOMA PLANEJ."] += meta
+            
+            # Adicionar linha TOTAL
+            linha_total = {"HORA": "TOTAL"}
+            for cam in caminhoes_op: linha_total[cam] = totais_dict[cam]
+            linha_total["SOMA REALIZADA"] = totais_dict["SOMA REALIZADA"]
+            linha_total["SOMA PLANEJ."] = totais_dict["SOMA PLANEJ."]
+            
+            pct_total = f"{(totais_dict['SOMA REALIZADA'] / totais_dict['SOMA PLANEJ.'] * 100):.0f}%" if totais_dict["SOMA PLANEJ."] > 0 else "0%"
+            linha_total["% DESEMPENHO"] = pct_total
+            
+            tabela_excel.append(linha_total)
             
             df_ex = pd.DataFrame(tabela_excel)
             st.dataframe(df_ex, use_container_width=True, hide_index=True)
-            st.markdown(f"**Viagens Realizadas (Total): {totais['r_hora']}** | **Tonelada Produzida (Est.): {totais['r_hora']*34} t**")
             
-            fig = go.Figure()
-            fig.add_trace(go.Bar(x=df_ex['HORARIO'], y=df_ex['Realizado Hora'], name='Realizado', marker_color='#4682B4'))
-            fig.add_trace(go.Bar(x=df_ex['HORARIO'], y=df_ex['Meta Hora'], name='Meta', marker_color='#B0C4DE'))
-            fig.update_layout(title="Produção vs Meta (Hora a Hora)", barmode='group', plot_bgcolor=COR_FUNDO)
-            st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("Sem dados de produção (carga) para o dia selecionado.")
 
@@ -439,16 +444,6 @@ def tela_gestor():
         c_d3.markdown(f"<div class='dir-card'><div class='dir-titulo'>% Utilização Martelo</div><div class='dir-valor'>{pct_martelo}</div></div>", unsafe_allow_html=True)
         c_d4.markdown(f"<div class='dir-card'><div class='dir-titulo'>Consumo Combustível</div><div class='dir-valor'>{litros_total:,.0f} L</div></div>", unsafe_allow_html=True)
         c_d5.markdown(f"<div class='dir-card'><div class='dir-titulo'>Ocorrências de Parada</div><div class='dir-valor'>{qtd_paradas}</div></div>", unsafe_allow_html=True)
-
-        st.write("---")
-        st.markdown("**Análise de Paradas por Motivo**")
-        if qtd_paradas > 0:
-            paradas_lista = [d['motivo'] for d in df_rp_dir[df_rp_dir['tipo_registro'] == 'Parada']['detalhes'] if isinstance(d, dict) and 'motivo' in d]
-            if paradas_lista:
-                df_graf_paradas = pd.Series(paradas_lista).value_counts().reset_index()
-                df_graf_paradas.columns = ['Motivo', 'Quantidade']
-                fig_par = px.pie(df_graf_paradas, names='Motivo', values='Quantidade', hole=0.4)
-                st.plotly_chart(fig_par, use_container_width=True)
 
     with aba_dados:
         c_t1, c_t2, c_t3, c_t4 = st.tabs(["Carga", "Perfuração", "Fechamentos", "Registros Parciais"])
