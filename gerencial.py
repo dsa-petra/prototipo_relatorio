@@ -39,8 +39,6 @@ st.markdown(f"""
     button:has(p:contains("➖")):active {{ transform: translateY(4px) !important; box-shadow: 0px 4px 10px rgba(255,23,68,0.3) !important; }}
     button:has(p:contains("➖")) p {{ font-size: 50px !important; font-weight: bold; margin: 0; line-height: 50px; }}
     
-    .entrada-valor {{ font-size: 60px; font-weight: 900; text-align: center; color: {COR_AMARELA}; background-color: #1e1e1e; border: 3px solid {COR_AZUL}; border-radius: 15px; padding: 10px; display: block; width: 100%; margin: 10px 0; }}
-    
     .dir-card {{ background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid {COR_AZUL}; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
     .dir-titulo {{ font-size: 14px; color: #6c757d; font-weight: bold; text-transform: uppercase; }}
     .dir-valor {{ font-size: 24px; font-weight: 900; color: {COR_AZUL}; margin-top: 5px; }}
@@ -96,6 +94,11 @@ def carregar_dados_gestor():
     df_pcp = pd.DataFrame(supabase.table("pcp_planejamento").select("*").execute().data)
     df_rp = pd.DataFrame(supabase.table("registros_parciais").select("*").execute().data)
     return df_c, df_p, df_pt, df_pcp, df_rp
+
+def destacar_linha_total(row):
+    if row['HORA'] == 'TOTAL':
+        return ['background-color: #334155; font-weight: bold; color: #ffc107'] * len(row)
+    return [''] * len(row)
 
 # ==========================================
 # 3. TELAS DO SISTEMA
@@ -156,7 +159,6 @@ def tela_operacao():
     
     st.markdown("### ⏰ Selecione o Período do Apontamento")
     
-    # Exibir os intervalos no seletor, mas o valor real é a hora base
     opcoes_intervalos = [INTERVALOS[h] for h in HORARIOS_TURNO]
     idx_atual = HORARIOS_TURNO.index(st.session_state.slot_selecionado_estado)
     
@@ -345,14 +347,53 @@ def tela_gestor():
     aba_pcp, aba_diretoria, aba_dados, aba_config = st.tabs(["📋 Acompanhamento Diário", "📊 Visão Diretoria", "🗄️ Dados Brutos", "🛠️ Cadastros"])
 
     with aba_pcp:
-        st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>Detalhe Produção - {datetime.today().strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
-        dia_alvo = st.date_input("Selecionar Data:", datetime.today())
+        # Formato de Data Brasileiro (DD/MM/YYYY)
+        dia_alvo = st.date_input("📅 Selecionar Data:", datetime.today(), format="DD/MM/YYYY")
         dia_alvo_str = dia_alvo.strftime("%Y-%m-%d")
         
+        # Edição de Horários e Metas
+        with st.expander("⚙️ Ajustar Horários e Metas (Planejado)", expanded=False):
+            with st.form("form_edit_metas"):
+                st.write(f"Atualize o planejamento para uma hora específica do dia **{dia_alvo.strftime('%d/%m/%Y')}**:")
+                c_edit1, c_edit2, c_edit3 = st.columns(3)
+                
+                # Exibir os intervalos no seletor, mas o valor real é a hora base
+                opcoes_edit = [INTERVALOS[h] for h in HORARIOS_TURNO]
+                intervalo_edit = c_edit1.selectbox("Período:", opcoes_edit)
+                hora_edit = HORARIOS_TURNO[opcoes_edit.index(intervalo_edit)]
+                
+                linha_c_edit = df_carga[(df_carga['data_id'] == dia_alvo_str) & (df_carga['hora'] == hora_edit)] if not df_carga.empty else pd.DataFrame()
+                linha_p_edit = df_perf[(df_perf['data_id'] == dia_alvo_str) & (df_perf['hora'] == hora_edit)] if not df_perf.empty else pd.DataFrame()
+                
+                meta_v_atual = int(linha_c_edit.iloc[0]['meta']) if not linha_c_edit.empty else 0
+                meta_m_atual = float(linha_p_edit.iloc[0]['meta']) if not linha_p_edit.empty else 0.0
+                
+                nova_meta_v = c_edit2.number_input("Meta Carga (Viagens):", value=meta_v_atual, step=1)
+                nova_meta_m = c_edit3.number_input("Meta Perfuração (Metros):", value=meta_m_atual, step=1.0)
+                
+                if st.form_submit_button("💾 Salvar Ajustes"):
+                    # Força a inserção da linha caso a hora ainda não exista no banco naquele dia
+                    if linha_c_edit.empty:
+                        supabase.table("horaria_carga").insert({"data_id": dia_alvo_str, "hora": hora_edit, "meta": nova_meta_v, "ut33": 0, "ut34": 0, "causa": ""}).execute()
+                    else:
+                        supabase.table("horaria_carga").update({"meta": nova_meta_v}).eq("data_id", dia_alvo_str).eq("hora", hora_edit).execute()
+                        
+                    if linha_p_edit.empty:
+                        supabase.table("horaria_perf").insert({"data_id": dia_alvo_str, "hora": hora_edit, "meta": nova_meta_m, "realizado": 0.0, "causa": ""}).execute()
+                    else:
+                        supabase.table("horaria_perf").update({"meta": nova_meta_m}).eq("data_id", dia_alvo_str).eq("hora", hora_edit).execute()
+                        
+                    st.success("Metas atualizadas com sucesso!")
+                    time.sleep(1)
+                    st.rerun()
+        
+        st.write("---")
+
+        # Tabela Carga
+        st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>🚜 Operação de Carga - {dia_alvo.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
         df_carga_alvo = df_carga[df_carga['data_id'] == dia_alvo_str] if not df_carga.empty else pd.DataFrame()
         
         if not df_carga_alvo.empty:
-            # Descobrir quais caminhões operaram (tiveram algum valor > 0)
             caminhoes_op = []
             for col in df_carga_alvo.columns:
                 if 'ut' in col.lower() and df_carga_alvo[col].sum() > 0:
@@ -360,8 +401,8 @@ def tela_gestor():
             
             tabela_excel = []
             totais_dict = {cam: 0 for cam in caminhoes_op}
-            totais_dict["SOMA REALIZADA"] = 0
-            totais_dict["SOMA PLANEJ."] = 0
+            totais_dict["REALIZADO"] = 0
+            totais_dict["PLANEJADO"] = 0
             
             for hora in HORARIOS_TURNO:
                 linha = df_carga_alvo[df_carga_alvo['hora'] == hora]
@@ -376,33 +417,70 @@ def tela_gestor():
                 
                 meta = linha.iloc[0]['meta'] if not linha.empty else 0
                 
-                linha_dados["SOMA REALIZADA"] = realizado_h
-                linha_dados["SOMA PLANEJ."] = meta
-                
+                linha_dados["REALIZADO"] = realizado_h
+                linha_dados["PLANEJADO"] = meta
                 pct = f"{(realizado_h / meta * 100):.0f}%" if meta > 0 else "0%"
                 linha_dados["% DESEMPENHO"] = pct
                 
                 tabela_excel.append(linha_dados)
-                
-                totais_dict["SOMA REALIZADA"] += realizado_h
-                totais_dict["SOMA PLANEJ."] += meta
+                totais_dict["REALIZADO"] += realizado_h
+                totais_dict["PLANEJADO"] += meta
             
-            # Adicionar linha TOTAL
             linha_total = {"HORA": "TOTAL"}
             for cam in caminhoes_op: linha_total[cam] = totais_dict[cam]
-            linha_total["SOMA REALIZADA"] = totais_dict["SOMA REALIZADA"]
-            linha_total["SOMA PLANEJ."] = totais_dict["SOMA PLANEJ."]
-            
-            pct_total = f"{(totais_dict['SOMA REALIZADA'] / totais_dict['SOMA PLANEJ.'] * 100):.0f}%" if totais_dict["SOMA PLANEJ."] > 0 else "0%"
+            linha_total["REALIZADO"] = totais_dict["REALIZADO"]
+            linha_total["PLANEJADO"] = totais_dict["PLANEJADO"]
+            pct_total = f"{(totais_dict['REALIZADO'] / totais_dict['PLANEJADO'] * 100):.0f}%" if totais_dict["PLANEJADO"] > 0 else "0%"
             linha_total["% DESEMPENHO"] = pct_total
             
             tabela_excel.append(linha_total)
             
             df_ex = pd.DataFrame(tabela_excel)
-            st.dataframe(df_ex, use_container_width=True, hide_index=True)
-            
+            st.dataframe(df_ex.style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
         else:
             st.warning("Sem dados de produção (carga) para o dia selecionado.")
+            
+        st.write("---")
+        
+        # Tabela Perfuração
+        st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>🎯 Operação de Perfuração - {dia_alvo.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
+        df_perf_alvo = df_perf[df_perf['data_id'] == dia_alvo_str] if not df_perf.empty else pd.DataFrame()
+        
+        if not df_perf_alvo.empty:
+            tabela_perf = []
+            totais_p = {"REALIZADO": 0, "PLANEJADO": 0}
+            
+            for hora in HORARIOS_TURNO:
+                linha = df_perf_alvo[df_perf_alvo['hora'] == hora]
+                
+                realizado_p = float(linha.iloc[0]['realizado']) if not linha.empty else 0.0
+                meta_p = float(linha.iloc[0]['meta']) if not linha.empty else 0.0
+                pct_p = f"{(realizado_p / meta_p * 100):.0f}%" if meta_p > 0 else "0%"
+                
+                tabela_perf.append({
+                    "HORA": INTERVALOS[hora],
+                    "REALIZADO": realizado_p,
+                    "PLANEJADO": meta_p,
+                    "% DESEMPENHO": pct_p
+                })
+                totais_p["REALIZADO"] += realizado_p
+                totais_p["PLANEJADO"] += meta_p
+            
+            pct_total_p = f"{(totais_p['REALIZADO'] / totais_p['PLANEJADO'] * 100):.0f}%" if totais_p["PLANEJADO"] > 0 else "0%"
+            
+            tabela_perf.append({
+                "HORA": "TOTAL",
+                "REALIZADO": totais_p["REALIZADO"],
+                "PLANEJADO": totais_p["PLANEJADO"],
+                "% DESEMPENHO": pct_total_p
+            })
+            
+            df_ex_p = pd.DataFrame(tabela_perf)
+            # Formatar a coluna Realizado para ter 1 casa decimal no pandas
+            df_ex_p['REALIZADO'] = df_ex_p['REALIZADO'].apply(lambda x: f"{x:.1f}" if isinstance(x, float) else x)
+            st.dataframe(df_ex_p.style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
+        else:
+            st.warning("Sem dados de perfuração para o dia selecionado.")
 
     with aba_diretoria:
         st.markdown(f"<h3 style='color:{COR_AZUL};'>Indicadores de Desempenho</h3>", unsafe_allow_html=True)
