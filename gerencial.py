@@ -91,9 +91,9 @@ def carregar_dados_gestor():
     df_c = pd.DataFrame(supabase.table("horaria_carga").select("*").execute().data)
     df_p = pd.DataFrame(supabase.table("horaria_perf").select("*").execute().data)
     df_pt = pd.DataFrame(supabase.table("parte_diaria").select("*").execute().data)
-    df_pcp = pd.DataFrame(supabase.table("pcp_planejamento").select("*").execute().data)
     df_rp = pd.DataFrame(supabase.table("registros_parciais").select("*").execute().data)
-    return df_c, df_p, df_pt, df_pcp, df_rp
+    df_os = pd.DataFrame(supabase.table("ordens_servico").select("*").execute().data)
+    return df_c, df_p, df_pt, df_rp, df_os
 
 def destacar_linha_total(row):
     if row['HORA'] == 'TOTAL':
@@ -170,15 +170,32 @@ def tela_operacao():
         st.session_state.incremento_val = 0
         st.rerun()
 
-    # Botoes Superiores
+    # ==========================
+    # FORMULÁRIOS SECUNDÁRIOS
+    # ==========================
     c_check, c_parada, c_abastecimento = st.columns(3)
+    
     with c_check:
         with st.popover("📋 Checklist", use_container_width=True):
             res_chk = supabase.table("itens_checklist").select("item").in_("tipo_equipamento", [st.session_state.tipo_equipamento, 'ambos']).execute()
             respostas_chk = {linha['item']: st.selectbox(f"{linha['item']}:", ["OK", "Atenção", "Crítico"], key=f"chk_{i}") for i, linha in enumerate(res_chk.data or [])}
+            
             if st.button("Enviar ao PCP", use_container_width=True):
-                supabase.table("registros_parciais").insert({"data": data_hoje, "hora": slot_atual, "equipamento": st.session_state.tag_equipamento, "operador": st.session_state.usuario, "tipo_registro": "Checklist", "detalhes": respostas_chk}).execute()
-                st.success("Enviado!")
+                hora_exata = datetime.now().strftime("%H:%M")
+                supabase.table("registros_parciais").insert({
+                    "data": data_hoje, "hora": hora_exata, "equipamento": st.session_state.tag_equipamento, 
+                    "operador": st.session_state.usuario, "tipo_registro": "Checklist", "detalhes": respostas_chk
+                }).execute()
+                
+                itens_criticos = [item for item, status in respostas_chk.items() if status == "Crítico"]
+                if itens_criticos:
+                    for item in itens_criticos:
+                        supabase.table("ordens_servico").insert({
+                            "data_abertura": data_hoje, "hora_abertura": hora_exata, "equipamento": st.session_state.tag_equipamento,
+                            "operador": st.session_state.usuario, "motivo": f"Checklist Crítico: {item}", "status": "ABERTA"
+                        }).execute()
+                    st.warning("⚠️ OS de Manutenção aberta automaticamente por item Crítico!")
+                st.success("Checklist Enviado!")
 
     with c_parada:
         with st.popover("🛑 Parada", use_container_width=True):
@@ -186,29 +203,41 @@ def tela_operacao():
             opcoes_parada = [m['motivo'] for m in res_par.data] if res_par.data else ["Nenhuma"]
             motivo_sel = st.selectbox("Motivo:", opcoes_parada)
             c_h1, c_h2 = st.columns(2)
-            hora_inicio = c_h1.time_input("Início")
-            hora_fim = c_h2.time_input("Fim")
+            hora_inicio = c_h1.time_input("Início da Parada")
+            hora_fim = c_h2.time_input("Fim da Parada")
+            
             if st.button("Avisar PCP", use_container_width=True):
                 h_ini_str = hora_inicio.strftime("%H:%M")
                 h_fim_str = hora_fim.strftime("%H:%M")
                 detalhes_parada = {"motivo": motivo_sel, "inicio": h_ini_str, "fim": h_fim_str}
-                supabase.table("registros_parciais").insert({"data": data_hoje, "hora": slot_atual, "equipamento": st.session_state.tag_equipamento, "operador": st.session_state.usuario, "tipo_registro": "Parada", "detalhes": detalhes_parada}).execute()
+                
+                supabase.table("registros_parciais").insert({
+                    "data": data_hoje, "hora": h_ini_str, "equipamento": st.session_state.tag_equipamento, 
+                    "operador": st.session_state.usuario, "tipo_registro": "Parada", "detalhes": detalhes_parada
+                }).execute()
+                
                 tabela_gestor = "horaria_carga" if e_caminhao else "horaria_perf"
                 supabase.table(tabela_gestor).update({"causa": f"{motivo_sel} ({h_ini_str}-{h_fim_str})"}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-                st.success("Parada registrada!")
+                st.success("Parada registrada com a Hora Inicial vinculada!")
 
     with c_abastecimento:
         with st.popover("⛽ Abastecimento", use_container_width=True):
             litros = st.number_input("Litros:", min_value=0.0, step=1.0)
             horimetro_abast = st.number_input("Horímetro Atual:", min_value=0.0, step=0.1)
             if st.button("Gravar Abastecimento", use_container_width=True):
+                hora_exata = datetime.now().strftime("%H:%M")
                 detalhes_abast = {"litros": litros, "horimetro": horimetro_abast}
-                supabase.table("registros_parciais").insert({"data": data_hoje, "hora": slot_atual, "equipamento": st.session_state.tag_equipamento, "operador": st.session_state.usuario, "tipo_registro": "Abastecimento", "detalhes": detalhes_abast}).execute()
+                supabase.table("registros_parciais").insert({
+                    "data": data_hoje, "hora": hora_exata, "equipamento": st.session_state.tag_equipamento, 
+                    "operador": st.session_state.usuario, "tipo_registro": "Abastecimento", "detalhes": detalhes_abast
+                }).execute()
                 st.success("Abastecimento gravado!")
 
     st.write("---")
 
-    # Tela Apontamento
+    # ==========================
+    # APONTAMENTO DE PRODUÇÃO
+    # ==========================
     res_pcp = supabase.table("pcp_planejamento").select("*").eq("data", data_hoje).execute()
     meta_viagens = res_pcp.data[0]['meta_viagens_equipe_hora'] if res_pcp.data else 0
     meta_metros = res_pcp.data[0]['meta_perf_metros_hora'] if res_pcp.data else 0.0
@@ -230,15 +259,13 @@ def tela_operacao():
         c_menos, c_valor, c_mais = st.columns([1, 2, 1])
         with c_menos:
             if st.button("➖", key="sub_v", use_container_width=True):
-                st.session_state.incremento_val = max(0, int(st.session_state.incremento_val) - 1)
-                st.rerun()
+                st.session_state.incremento_val = max(0, int(st.session_state.incremento_val) - 1); st.rerun()
         with c_valor:
             val_input = st.number_input("Lancamento", value=int(st.session_state.incremento_val), step=1, format="%d", label_visibility="collapsed")
             if val_input != st.session_state.incremento_val: st.session_state.incremento_val = val_input
         with c_mais:
             if st.button("➕", key="add_v", use_container_width=True):
-                st.session_state.incremento_val = int(st.session_state.incremento_val) + 1
-                st.rerun()
+                st.session_state.incremento_val = int(st.session_state.incremento_val) + 1; st.rerun()
                 
         st.write("")
         if st.button("🚀 Lançar Apontamento e Zerar", use_container_width=True, type="primary"):
@@ -246,11 +273,8 @@ def tela_operacao():
                 novo_valor = valor_db_atual + st.session_state.incremento_val
                 supabase.table("horaria_carga").update({coluna_db: novo_valor}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
                 st.session_state.incremento_val = 0 
-                st.success("✔️ Salvo!")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.warning("O valor deve ser maior que zero.")
+                st.success("✔️ Salvo!"); time.sleep(1); st.rerun()
+            else: st.warning("O valor deve ser maior que zero.")
             
     else: 
         res_hora = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
@@ -266,15 +290,13 @@ def tela_operacao():
         c_menos, c_valor, c_mais = st.columns([1, 2, 1])
         with c_menos:
             if st.button("➖", key="sub_p", use_container_width=True):
-                st.session_state.incremento_val = max(0.0, float(st.session_state.incremento_val) - 1.0)
-                st.rerun()
+                st.session_state.incremento_val = max(0.0, float(st.session_state.incremento_val) - 1.0); st.rerun()
         with c_valor:
             val_input = st.number_input("Lancamento", value=float(st.session_state.incremento_val), step=1.0, format="%.1f", label_visibility="collapsed")
             if val_input != st.session_state.incremento_val: st.session_state.incremento_val = val_input
         with c_mais:
             if st.button("➕", key="add_p", use_container_width=True):
-                st.session_state.incremento_val = float(st.session_state.incremento_val) + 1.0
-                st.rerun()
+                st.session_state.incremento_val = float(st.session_state.incremento_val) + 1.0; st.rerun()
                 
         st.write("")
         if st.button("🚀 Lançar Apontamento e Zerar", use_container_width=True, type="primary"):
@@ -282,11 +304,80 @@ def tela_operacao():
                 novo_valor = valor_db_atual + st.session_state.incremento_val
                 supabase.table("horaria_perf").update({"realizado": novo_valor}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
                 st.session_state.incremento_val = 0 
-                st.success("✔️ Salvo!")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.warning("O valor deve ser maior que zero.")
+                st.success("✔️ Salvo!"); time.sleep(1); st.rerun()
+            else: st.warning("O valor deve ser maior que zero.")
+
+    st.write("---")
+
+    # ==========================
+    # TABELA DE RESUMO PARA O OPERADOR
+    # ==========================
+    st.markdown(f"<h4 style='color:{COR_AZUL}; text-align:center;'>📊 Resumo da Operação Hoje</h4>", unsafe_allow_html=True)
+    
+    if e_caminhao:
+        res_op_carga = supabase.table("horaria_carga").select("*").eq("data_id", data_hoje).execute().data
+        df_op_carga = pd.DataFrame(res_op_carga)
+        
+        if not df_op_carga.empty:
+            caminhoes_op = [col.upper() for col in df_op_carga.columns if 'ut' in col.lower() and df_op_carga[col].sum() > 0]
+            tabela_excel = []
+            totais_dict = {cam: 0 for cam in caminhoes_op}
+            totais_dict["REALIZADO"] = 0; totais_dict["PLANEJADO"] = 0
+            
+            for hora in HORARIOS_TURNO:
+                linha = df_op_carga[df_op_carga['hora'] == hora]
+                linha_dados = {"HORA": INTERVALOS[hora]}
+                
+                realizado_h = 0
+                for cam in caminhoes_op:
+                    val_c = linha.iloc[0][cam.lower()] if not linha.empty and cam.lower() in linha.columns else 0
+                    linha_dados[cam] = val_c
+                    realizado_h += val_c
+                    totais_dict[cam] += val_c
+                
+                meta = linha.iloc[0]['meta'] if not linha.empty else 0
+                linha_dados["REALIZADO"] = realizado_h
+                linha_dados["PLANEJADO"] = meta
+                linha_dados["% DESEMPENHO"] = f"{(realizado_h / meta * 100):.0f}%" if meta > 0 else "0%"
+                
+                tabela_excel.append(linha_dados)
+                totais_dict["REALIZADO"] += realizado_h
+                totais_dict["PLANEJADO"] += meta
+            
+            linha_total = {"HORA": "TOTAL"}
+            for cam in caminhoes_op: linha_total[cam] = totais_dict[cam]
+            linha_total["REALIZADO"] = totais_dict["REALIZADO"]; linha_total["PLANEJADO"] = totais_dict["PLANEJADO"]
+            linha_total["% DESEMPENHO"] = f"{(totais_dict['REALIZADO'] / totais_dict['PLANEJADO'] * 100):.0f}%" if totais_dict["PLANEJADO"] > 0 else "0%"
+            tabela_excel.append(linha_total)
+            
+            st.dataframe(pd.DataFrame(tabela_excel).style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
+        else:
+            st.info("Ainda não existem registos de carga para o dia de hoje.")
+            
+    else: # Perfuração
+        res_op_perf = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).execute().data
+        df_op_perf = pd.DataFrame(res_op_perf)
+        
+        if not df_op_perf.empty:
+            tabela_perf = []
+            totais_p = {"REALIZADO": 0, "PLANEJADO": 0}
+            
+            for hora in HORARIOS_TURNO:
+                linha = df_op_perf[df_op_perf['hora'] == hora]
+                realizado_p = float(linha.iloc[0]['realizado']) if not linha.empty else 0.0
+                meta_p = float(linha.iloc[0]['meta']) if not linha.empty else 0.0
+                
+                tabela_perf.append({"HORA": INTERVALOS[hora], "REALIZADO": realizado_p, "PLANEJADO": meta_p, "% DESEMPENHO": f"{(realizado_p / meta_p * 100):.0f}%" if meta_p > 0 else "0%"})
+                totais_p["REALIZADO"] += realizado_p
+                totais_p["PLANEJADO"] += meta_p
+            
+            tabela_perf.append({"HORA": "TOTAL", "REALIZADO": totais_p["REALIZADO"], "PLANEJADO": totais_p["PLANEJADO"], "% DESEMPENHO": f"{(totais_p['REALIZADO'] / totais_p['PLANEJADO'] * 100):.0f}%" if totais_p["PLANEJADO"] > 0 else "0%"})
+            
+            df_ex_p = pd.DataFrame(tabela_perf)
+            df_ex_p['REALIZADO'] = df_ex_p['REALIZADO'].apply(lambda x: f"{x:.1f}" if isinstance(x, float) else x)
+            st.dataframe(df_ex_p.style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
+        else:
+            st.info("Ainda não existem registos de perfuração para o dia de hoje.")
 
     st.write("---")
     
@@ -316,8 +407,7 @@ def tela_operacao():
                         dados["horimetro_martelo_final"] = hm_final
                     supabase.table("parte_diaria").insert(dados).execute()
                     st.success("Relatório de Turno enviado com sucesso!")
-                else:
-                    st.error("Erro: O Horímetro Final é menor que o Inicial.")
+                else: st.error("Erro: O Horímetro Final é menor que o Inicial.")
 
 def tela_gestor():
     col_logo, col_titulo = st.columns([1, 4])
@@ -325,7 +415,7 @@ def tela_gestor():
         st.markdown(f"<h1 style='color: {COR_AZUL};'>📊 Painel de Controle - Operação</h1>", unsafe_allow_html=True)
     st.divider()
 
-    df_carga, df_perf, df_parte, df_pcp, df_rp = carregar_dados_gestor()
+    df_carga, df_perf, df_parte, df_rp, df_os = carregar_dados_gestor()
     data_hoje_str = datetime.today().strftime('%Y-%m-%d')
     
     # Cálculos KPI Hoje
@@ -335,7 +425,6 @@ def tela_gestor():
     cols_ut = [c for c in df_carga_hoje.columns if 'ut' in c.lower()] if not df_carga_hoje.empty else []
     total_viagens = df_carga_hoje[cols_ut].sum().sum() if not df_carga_hoje.empty else 0
     meta_viagens = df_carga_hoje['meta'].sum() if not df_carga_hoje.empty else 0
-    
     total_metros = df_perf_hoje['realizado'].sum() if not df_perf_hoje.empty else 0
     meta_metros = df_perf_hoje['meta'].sum() if not df_perf_hoje.empty else 0
 
@@ -344,20 +433,17 @@ def tela_gestor():
     c2.markdown(f"<div class='kpi-card'><p class='kpi-title'>Metros (Realizado / Planejado)</p><p class='kpi-value'>🎯 {total_metros:.1f} / {meta_metros:.1f}</p></div>", unsafe_allow_html=True)
     st.write("") 
 
-    aba_pcp, aba_diretoria, aba_dados, aba_config = st.tabs(["📋 Acompanhamento Diário", "📊 Visão Diretoria", "🗄️ Dados Brutos", "🛠️ Cadastros"])
+    aba_pcp, aba_manutencao, aba_diretoria, aba_dados, aba_config = st.tabs(["📋 Acompanhamento Diário", "🔧 Manutenção (OS)", "📊 Visão Diretoria", "🗄️ Dados Brutos", "🛠️ Cadastros"])
 
     with aba_pcp:
-        # Formato de Data Brasileiro (DD/MM/YYYY)
         dia_alvo = st.date_input("📅 Selecionar Data:", datetime.today(), format="DD/MM/YYYY")
         dia_alvo_str = dia_alvo.strftime("%Y-%m-%d")
         
-        # Edição de Horários e Metas
         with st.expander("⚙️ Ajustar Horários e Metas (Planejado)", expanded=False):
             with st.form("form_edit_metas"):
                 st.write(f"Atualize o planejamento para uma hora específica do dia **{dia_alvo.strftime('%d/%m/%Y')}**:")
                 c_edit1, c_edit2, c_edit3 = st.columns(3)
                 
-                # Exibir os intervalos no seletor, mas o valor real é a hora base
                 opcoes_edit = [INTERVALOS[h] for h in HORARIOS_TURNO]
                 intervalo_edit = c_edit1.selectbox("Período:", opcoes_edit)
                 hora_edit = HORARIOS_TURNO[opcoes_edit.index(intervalo_edit)]
@@ -372,7 +458,6 @@ def tela_gestor():
                 nova_meta_m = c_edit3.number_input("Meta Perfuração (Metros):", value=meta_m_atual, step=1.0)
                 
                 if st.form_submit_button("💾 Salvar Ajustes"):
-                    # Força a inserção da linha caso a hora ainda não exista no banco naquele dia
                     if linha_c_edit.empty:
                         supabase.table("horaria_carga").insert({"data_id": dia_alvo_str, "hora": hora_edit, "meta": nova_meta_v, "ut33": 0, "ut34": 0, "causa": ""}).execute()
                     else:
@@ -383,26 +468,18 @@ def tela_gestor():
                     else:
                         supabase.table("horaria_perf").update({"meta": nova_meta_m}).eq("data_id", dia_alvo_str).eq("hora", hora_edit).execute()
                         
-                    st.success("Metas atualizadas com sucesso!")
-                    time.sleep(1)
-                    st.rerun()
+                    st.success("Metas atualizadas com sucesso!"); time.sleep(1); st.rerun()
         
         st.write("---")
 
-        # Tabela Carga
         st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>🚜 Operação de Carga - {dia_alvo.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
         df_carga_alvo = df_carga[df_carga['data_id'] == dia_alvo_str] if not df_carga.empty else pd.DataFrame()
         
         if not df_carga_alvo.empty:
-            caminhoes_op = []
-            for col in df_carga_alvo.columns:
-                if 'ut' in col.lower() and df_carga_alvo[col].sum() > 0:
-                    caminhoes_op.append(col.upper())
-            
+            caminhoes_op = [col.upper() for col in df_carga_alvo.columns if 'ut' in col.lower() and df_carga_alvo[col].sum() > 0]
             tabela_excel = []
             totais_dict = {cam: 0 for cam in caminhoes_op}
-            totais_dict["REALIZADO"] = 0
-            totais_dict["PLANEJADO"] = 0
+            totais_dict["REALIZADO"] = 0; totais_dict["PLANEJADO"] = 0
             
             for hora in HORARIOS_TURNO:
                 linha = df_carga_alvo[df_carga_alvo['hora'] == hora]
@@ -416,11 +493,9 @@ def tela_gestor():
                     totais_dict[cam] += val_c
                 
                 meta = linha.iloc[0]['meta'] if not linha.empty else 0
-                
                 linha_dados["REALIZADO"] = realizado_h
                 linha_dados["PLANEJADO"] = meta
-                pct = f"{(realizado_h / meta * 100):.0f}%" if meta > 0 else "0%"
-                linha_dados["% DESEMPENHO"] = pct
+                linha_dados["% DESEMPENHO"] = f"{(realizado_h / meta * 100):.0f}%" if meta > 0 else "0%"
                 
                 tabela_excel.append(linha_dados)
                 totais_dict["REALIZADO"] += realizado_h
@@ -428,21 +503,15 @@ def tela_gestor():
             
             linha_total = {"HORA": "TOTAL"}
             for cam in caminhoes_op: linha_total[cam] = totais_dict[cam]
-            linha_total["REALIZADO"] = totais_dict["REALIZADO"]
-            linha_total["PLANEJADO"] = totais_dict["PLANEJADO"]
-            pct_total = f"{(totais_dict['REALIZADO'] / totais_dict['PLANEJADO'] * 100):.0f}%" if totais_dict["PLANEJADO"] > 0 else "0%"
-            linha_total["% DESEMPENHO"] = pct_total
-            
+            linha_total["REALIZADO"] = totais_dict["REALIZADO"]; linha_total["PLANEJADO"] = totais_dict["PLANEJADO"]
+            linha_total["% DESEMPENHO"] = f"{(totais_dict['REALIZADO'] / totais_dict['PLANEJADO'] * 100):.0f}%" if totais_dict["PLANEJADO"] > 0 else "0%"
             tabela_excel.append(linha_total)
             
-            df_ex = pd.DataFrame(tabela_excel)
-            st.dataframe(df_ex.style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
-        else:
-            st.warning("Sem dados de produção (carga) para o dia selecionado.")
+            st.dataframe(pd.DataFrame(tabela_excel).style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
+        else: st.warning("Sem dados de produção (carga) para o dia selecionado.")
             
         st.write("---")
         
-        # Tabela Perfuração
         st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>🎯 Operação de Perfuração - {dia_alvo.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
         df_perf_alvo = df_perf[df_perf['data_id'] == dia_alvo_str] if not df_perf.empty else pd.DataFrame()
         
@@ -452,35 +521,29 @@ def tela_gestor():
             
             for hora in HORARIOS_TURNO:
                 linha = df_perf_alvo[df_perf_alvo['hora'] == hora]
-                
                 realizado_p = float(linha.iloc[0]['realizado']) if not linha.empty else 0.0
                 meta_p = float(linha.iloc[0]['meta']) if not linha.empty else 0.0
-                pct_p = f"{(realizado_p / meta_p * 100):.0f}%" if meta_p > 0 else "0%"
                 
-                tabela_perf.append({
-                    "HORA": INTERVALOS[hora],
-                    "REALIZADO": realizado_p,
-                    "PLANEJADO": meta_p,
-                    "% DESEMPENHO": pct_p
-                })
+                tabela_perf.append({"HORA": INTERVALOS[hora], "REALIZADO": realizado_p, "PLANEJADO": meta_p, "% DESEMPENHO": f"{(realizado_p / meta_p * 100):.0f}%" if meta_p > 0 else "0%"})
                 totais_p["REALIZADO"] += realizado_p
                 totais_p["PLANEJADO"] += meta_p
             
-            pct_total_p = f"{(totais_p['REALIZADO'] / totais_p['PLANEJADO'] * 100):.0f}%" if totais_p["PLANEJADO"] > 0 else "0%"
-            
-            tabela_perf.append({
-                "HORA": "TOTAL",
-                "REALIZADO": totais_p["REALIZADO"],
-                "PLANEJADO": totais_p["PLANEJADO"],
-                "% DESEMPENHO": pct_total_p
-            })
+            tabela_perf.append({"HORA": "TOTAL", "REALIZADO": totais_p["REALIZADO"], "PLANEJADO": totais_p["PLANEJADO"], "% DESEMPENHO": f"{(totais_p['REALIZADO'] / totais_p['PLANEJADO'] * 100):.0f}%" if totais_p["PLANEJADO"] > 0 else "0%"})
             
             df_ex_p = pd.DataFrame(tabela_perf)
-            # Formatar a coluna Realizado para ter 1 casa decimal no pandas
             df_ex_p['REALIZADO'] = df_ex_p['REALIZADO'].apply(lambda x: f"{x:.1f}" if isinstance(x, float) else x)
             st.dataframe(df_ex_p.style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
+        else: st.warning("Sem dados de perfuração para o dia selecionado.")
+
+    with aba_manutencao:
+        st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>🔧 Central de Ordens de Serviço (OS)</h3>", unsafe_allow_html=True)
+        st.write("Ordens de serviço abertas automaticamente por checklist crítico ou paradas operacionais, ou abertas manualmente.")
+        
+        if not df_os.empty:
+            df_os = df_os.sort_values(by='id', ascending=False)
+            st.dataframe(df_os, use_container_width=True, hide_index=True)
         else:
-            st.warning("Sem dados de perfuração para o dia selecionado.")
+            st.info("Nenhuma Ordem de Serviço registrada no momento.")
 
     with aba_diretoria:
         st.markdown(f"<h3 style='color:{COR_AZUL};'>Indicadores de Desempenho</h3>", unsafe_allow_html=True)
@@ -549,8 +612,7 @@ def tela_gestor():
                 motivo_del = st.selectbox("Selecione para excluir:", df_motivos['motivo'])
                 if st.button("Excluir Motivo Selecionado"):
                     supabase.table("motivos_parada").delete().eq("motivo", motivo_del).execute()
-                    st.success("Excluído com sucesso!")
-                    st.rerun()
+                    st.success("Excluído com sucesso!"); st.rerun()
 
         with col_check:
             st.markdown("**📋 Adicionar Item de Checklist**")
@@ -567,8 +629,7 @@ def tela_gestor():
                 check_del = st.selectbox("Selecione para excluir:", df_checks['item'])
                 if st.button("Excluir Item Selecionado"):
                     supabase.table("itens_checklist").delete().eq("item", check_del).execute()
-                    st.success("Excluído com sucesso!")
-                    st.rerun()
+                    st.success("Excluído com sucesso!"); st.rerun()
 
 # ==========================================
 # 4. CONTROLADOR MESTRE DE ROTAS
