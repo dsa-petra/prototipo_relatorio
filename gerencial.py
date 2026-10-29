@@ -33,8 +33,8 @@ st.markdown(f"""
     .meta-box {{ background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid {COR_AZUL}; margin-bottom: 20px; box-shadow: inset 0px 2px 5px rgba(0,0,0,0.05); display: flex; justify-content: space-around; text-align: center; }}
     .meta-titulo {{ font-size: 16px; color: #7f8c8d; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }}
     .meta-destaque {{ font-size: 28px; font-weight: bold; color: {COR_AZUL}; display: block; margin-top: 5px;}}
-    .valor-gigante {{ font-size: 80px; font-weight: 900; text-align: center; color: {COR_AMARELA}; line-height: 120px; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }}
     
+    /* Botões Gigantes Customizados (+ e -) */
     button:has(p:contains("➕")) {{ background: linear-gradient(180deg, #00e676 0%, #00c853 100%) !important; color: white !important; height: 120px !important; border-radius: 25px !important; border: 2px solid #00a042 !important; box-shadow: 0px 8px 15px rgba(0,200,83,0.3) !important; transition: all 0.2s !important; }}
     button:has(p:contains("➕")):active {{ transform: translateY(4px) !important; box-shadow: 0px 4px 10px rgba(0,200,83,0.3) !important; }}
     button:has(p:contains("➕")) p {{ font-size: 60px !important; font-weight: bold; margin: 0; }}
@@ -42,6 +42,24 @@ st.markdown(f"""
     button:has(p:contains("➖")) {{ background: linear-gradient(180deg, #ff5252 0%, #ff1744 100%) !important; color: white !important; height: 120px !important; border-radius: 25px !important; border: 2px solid #d50000 !important; box-shadow: 0px 8px 15px rgba(255,23,68,0.3) !important; transition: all 0.2s !important; }}
     button:has(p:contains("➖")):active {{ transform: translateY(4px) !important; box-shadow: 0px 4px 10px rgba(255,23,68,0.3) !important; }}
     button:has(p:contains("➖")) p {{ font-size: 60px !important; font-weight: bold; margin: 0; line-height: 50px; }}
+    
+    /* Novo Input Numérico Gigante */
+    div[data-testid="stNumberInput"] input[type="number"] {{
+        font-size: 70px !important;
+        font-weight: 900 !important;
+        text-align: center !important;
+        color: {COR_AMARELA} !important;
+        height: 120px !important;
+        border-radius: 20px !important;
+        background-color: #1e1e1e !important;
+        border: 3px solid {COR_AZUL} !important;
+        box-shadow: inset 0px 4px 10px rgba(0,0,0,0.2) !important;
+    }}
+    /* Esconder as setinhas padrão do input de número */
+    div[data-testid="stNumberInput"] input[type="number"]::-webkit-inner-spin-button, 
+    div[data-testid="stNumberInput"] input[type="number"]::-webkit-outer-spin-button {{
+        -webkit-appearance: none; margin: 0;
+    }}
     
     .dir-card {{ background-color: #f8f9fa; padding: 15px; border-radius: 10px; border-left: 4px solid {COR_AZUL}; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
     .dir-titulo {{ font-size: 14px; color: #6c757d; font-weight: bold; text-transform: uppercase; }}
@@ -67,14 +85,11 @@ if "perfil" not in st.session_state: st.session_state.perfil = None
 if "tela_atual" not in st.session_state: st.session_state.tela_atual = "login"
 if "tag_equipamento" not in st.session_state: st.session_state.tag_equipamento = None
 if "tipo_equipamento" not in st.session_state: st.session_state.tipo_equipamento = None
-if "dia_explodido" not in st.session_state: st.session_state.dia_explodido = None
-
-if "prod_val" not in st.session_state: st.session_state.prod_val = 0
-if "sync_pendente" not in st.session_state: st.session_state.sync_pendente = False
-if "ultima_alteracao" not in st.session_state: st.session_state.ultima_alteracao = 0
 if "slot_selecionado_estado" not in st.session_state: st.session_state.slot_selecionado_estado = None
 
-# Horários baseados no padrão Petra
+# Nova variável para a entrada manual de dados (zera após envio)
+if "incremento_val" not in st.session_state: st.session_state.incremento_val = 0
+
 HORARIOS_TURNO = ["06:15", "07:00", "08:00", "09:00", "10:00", "11:00", "13:00", "14:00", "15:00"]
 
 def obter_horario_sugerido():
@@ -143,6 +158,7 @@ def tela_selecao_maquina():
                     st.session_state.tipo_equipamento = df_eq[df_eq["tag"] == tag_selecionada].iloc[0]["tipo"]
                     st.session_state.tela_atual = "operacao"
                     st.session_state.slot_selecionado_estado = obter_horario_sugerido()
+                    st.session_state.incremento_val = 0 # Zera ao iniciar a máquina
                     st.rerun()
             else:
                 st.warning("Nenhum equipamento cadastrado.")
@@ -161,22 +177,8 @@ def tela_operacao():
     
     if slot_atual != st.session_state.slot_selecionado_estado:
         st.session_state.slot_selecionado_estado = slot_atual
-        st.session_state.sync_pendente = False
+        st.session_state.incremento_val = 0 # Zera a caixa se mudar de hora
         st.rerun()
-
-    if st.session_state.sync_pendente:
-        tempo_passado = time.time() - st.session_state.ultima_alteracao
-        if tempo_passado >= 10:
-            try:
-                if e_caminhao:
-                    coluna_db = st.session_state.tag_equipamento.lower().replace("-", "")
-                    supabase.table("horaria_carga").update({coluna_db: st.session_state.prod_val}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-                else:
-                    supabase.table("horaria_perf").update({"realizado": st.session_state.prod_val}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-                st.session_state.sync_pendente = False
-                st.toast(f"☁️ Apontamento das {slot_atual} salvo na nuvem!", icon="✅")
-            except Exception:
-                st.toast("⚠️ Sem sinal de internet. Tentando salvar novamente...", icon="🔄")
 
     # Botoes Superiores
     c_check, c_parada, c_abastecimento = st.columns(3)
@@ -216,7 +218,7 @@ def tela_operacao():
 
     st.write("---")
 
-    # Tela Apontamento
+    # Tela Apontamento (Lógica Incremental)
     res_pcp = supabase.table("pcp_planejamento").select("*").eq("data", data_hoje).execute()
     meta_viagens = res_pcp.data[0]['meta_viagens_equipe_hora'] if res_pcp.data else 0
     meta_metros = res_pcp.data[0]['meta_perf_metros_hora'] if res_pcp.data else 0.0
@@ -229,42 +231,75 @@ def tela_operacao():
             res_hora = supabase.table("horaria_carga").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
         
         df_hora = pd.DataFrame(res_hora.data)
-        if not st.session_state.sync_pendente and coluna_db in df_hora.columns:
-            st.session_state.prod_val = df_hora.iloc[0][coluna_db]
         
-        valor_equipe = sum([df_hora.iloc[0][col] for col in df_hora.columns if 'ut' in col.lower()])
-        st.markdown(f"<div class='meta-box'><div><span class='meta-titulo'>META (P)</span><span class='meta-destaque'>{meta_viagens if meta_viagens>0 else 'N/A'} viag.</span></div><div><span class='meta-titulo'>REALIZADO EQUIPE (R)</span><span class='meta-destaque'>{valor_equipe} viag.</span></div></div>", unsafe_allow_html=True)
+        # Leitura do valor consolidado no banco (para mostrar no banner)
+        valor_db_atual = int(df_hora.iloc[0][coluna_db]) if coluna_db in df_hora.columns else 0
+        valor_equipe_atual = sum([df_hora.iloc[0][col] for col in df_hora.columns if 'ut' in col.lower()])
+        
+        st.markdown(f"<div class='meta-box'><div><span class='meta-titulo'>META DA HORA (P)</span><span class='meta-destaque'>{meta_viagens if meta_viagens>0 else 'N/A'} viag.</span></div><div><span class='meta-titulo'>REALIZADO EQUIPE (R)</span><span class='meta-destaque'>{valor_equipe_atual} viag.</span></div></div>", unsafe_allow_html=True)
+        
+        st.markdown("<p style='text-align:center; color:#7f8c8d; margin-bottom:-10px;'>Novas Viagens a Lançar:</p>", unsafe_allow_html=True)
+        
         c_menos, c_valor, c_mais = st.columns([1, 1.5, 1])
         with c_menos:
             if st.button("➖", key="sub_v", use_container_width=True):
-                st.session_state.prod_val = max(0, int(st.session_state.prod_val) - 1)
-                st.session_state.sync_pendente = True; st.session_state.ultima_alteracao = time.time(); st.rerun()
-        with c_valor: st.markdown(f"<div class='valor-gigante'>{int(st.session_state.prod_val)}</div>", unsafe_allow_html=True)
+                st.session_state.incremento_val = max(0, int(st.session_state.incremento_val) - 1)
+                st.rerun()
+        with c_valor:
+            st.session_state.incremento_val = st.number_input("Lancamento", value=int(st.session_state.incremento_val), step=1, format="%d", label_visibility="collapsed")
         with c_mais:
             if st.button("➕", key="add_v", use_container_width=True):
-                st.session_state.prod_val = int(st.session_state.prod_val) + 1
-                st.session_state.sync_pendente = True; st.session_state.ultima_alteracao = time.time(); st.rerun()
+                st.session_state.incremento_val = int(st.session_state.incremento_val) + 1
+                st.rerun()
+                
+        st.write("")
+        if st.button("🚀 Lançar Apontamento", use_container_width=True, type="primary"):
+            if st.session_state.incremento_val > 0:
+                novo_valor = valor_db_atual + st.session_state.incremento_val
+                supabase.table("horaria_carga").update({coluna_db: novo_valor}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
+                st.session_state.incremento_val = 0 # Zera para a próxima
+                st.success("✔️ Apontamento registado no banco de dados!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.warning("O valor a lançar deve ser maior que zero.")
             
-    else: 
+    else: # Perfuração
         res_hora = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
         if not res_hora.data:
             supabase.table("horaria_perf").insert({"data_id": data_hoje, "hora": slot_atual, "realizado": 0.0, "meta": meta_metros, "causa": ""}).execute()
             res_hora = supabase.table("horaria_perf").select("*").eq("data_id", data_hoje).eq("hora", slot_atual).execute()
 
-        if not st.session_state.sync_pendente:
-            st.session_state.prod_val = res_hora.data[0]['realizado']
+        # Leitura do valor consolidado no banco
+        valor_db_atual = float(res_hora.data[0]['realizado'])
             
-        st.markdown(f"<div class='meta-box'><div><span class='meta-titulo'>META (P)</span><span class='meta-destaque'>{meta_metros if meta_metros>0 else 'N/A'} m</span></div><div><span class='meta-titulo'>REALIZADO (R)</span><span class='meta-destaque'>{float(st.session_state.prod_val):.1f} m</span></div></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='meta-box'><div><span class='meta-titulo'>META DA HORA (P)</span><span class='meta-destaque'>{meta_metros if meta_metros>0 else 'N/A'} m</span></div><div><span class='meta-titulo'>REALIZADO ACUMULADO (R)</span><span class='meta-destaque'>{valor_db_atual:.1f} m</span></div></div>", unsafe_allow_html=True)
+        
+        st.markdown("<p style='text-align:center; color:#7f8c8d; margin-bottom:-10px;'>Novos Metros a Lançar:</p>", unsafe_allow_html=True)
+
         c_menos, c_valor, c_mais = st.columns([1, 1.5, 1])
         with c_menos:
             if st.button("➖", key="sub_p", use_container_width=True):
-                st.session_state.prod_val = max(0.0, float(st.session_state.prod_val) - 1.0)
-                st.session_state.sync_pendente = True; st.session_state.ultima_alteracao = time.time(); st.rerun()
-        with c_valor: st.markdown(f"<div class='valor-gigante'>{float(st.session_state.prod_val):.1f}</div>", unsafe_allow_html=True)
+                st.session_state.incremento_val = max(0.0, float(st.session_state.incremento_val) - 1.0)
+                st.rerun()
+        with c_valor:
+            st.session_state.incremento_val = st.number_input("Lancamento", value=float(st.session_state.incremento_val), step=1.0, format="%.1f", label_visibility="collapsed")
         with c_mais:
             if st.button("➕", key="add_p", use_container_width=True):
-                st.session_state.prod_val = float(st.session_state.prod_val) + 1.0
-                st.session_state.sync_pendente = True; st.session_state.ultima_alteracao = time.time(); st.rerun()
+                st.session_state.incremento_val = float(st.session_state.incremento_val) + 1.0
+                st.rerun()
+                
+        st.write("")
+        if st.button("🚀 Lançar Apontamento", use_container_width=True, type="primary"):
+            if st.session_state.incremento_val > 0:
+                novo_valor = valor_db_atual + st.session_state.incremento_val
+                supabase.table("horaria_perf").update({"realizado": novo_valor}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
+                st.session_state.incremento_val = 0 # Zera para a próxima
+                st.success("✔️ Apontamento registado no banco de dados!")
+                time.sleep(1)
+                st.rerun()
+            else:
+                st.warning("O valor a lançar deve ser maior que zero.")
 
     st.write("---")
     
@@ -311,7 +346,6 @@ def tela_gestor():
     df_carga_hoje = df_carga[df_carga['data_id'] == data_hoje_str] if not df_carga.empty else pd.DataFrame()
     df_perf_hoje = df_perf[df_perf['data_id'] == data_hoje_str] if not df_perf.empty else pd.DataFrame()
     
-    # Somar todas as colunas que começam com 'ut' (Caminhões)
     cols_ut = [c for c in df_carga_hoje.columns if 'ut' in c.lower()] if not df_carga_hoje.empty else []
     total_viagens = df_carga_hoje[cols_ut].sum().sum() if not df_carga_hoje.empty else 0
     meta_viagens = df_carga_hoje['meta'].sum() if not df_carga_hoje.empty else 0
@@ -328,8 +362,6 @@ def tela_gestor():
 
     with aba_pcp:
         st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>Acompanhamento Diário de Produção</h3>", unsafe_allow_html=True)
-        
-        # Filtro de Data
         dia_alvo = st.date_input("Selecionar Data:", datetime.today())
         dia_alvo_str = dia_alvo.strftime("%Y-%m-%d")
         
@@ -357,10 +389,8 @@ def tela_gestor():
             
             df_ex = pd.DataFrame(tabela_excel)
             st.dataframe(df_ex, use_container_width=True, hide_index=True)
-            
             st.markdown(f"**Viagens Realizadas (Total): {totais['r_hora']}** | **Tonelada Produzida (Est.): {totais['r_hora']*34} t**")
             
-            # Gráfico Comparativo similar ao Excel
             fig = go.Figure()
             fig.add_trace(go.Bar(x=df_ex['HORARIO'], y=df_ex['Realizado Hora'], name='Realizado', marker_color='#4682B4'))
             fig.add_trace(go.Bar(x=df_ex['HORARIO'], y=df_ex['Meta Hora'], name='Meta', marker_color='#B0C4DE'))
@@ -373,24 +403,20 @@ def tela_gestor():
         st.markdown(f"<h3 style='color:{COR_AZUL};'>Indicadores de Desempenho</h3>", unsafe_allow_html=True)
         filtro_mes = st.selectbox("Mês de Referência:", [datetime.today().strftime('%Y-%m')] + sorted(list(set(pd.to_datetime(df_rp['data']).dt.strftime('%Y-%m')) if not df_rp.empty else []), reverse=True))
         
-        # Filtros e Cálculos
         df_c_dir = df_carga[df_carga['data_id'].str.startswith(filtro_mes)] if not df_carga.empty else pd.DataFrame()
         df_p_dir = df_perf[df_perf['data_id'].str.startswith(filtro_mes)] if not df_perf.empty else pd.DataFrame()
         df_pt_dir = df_parte[df_parte['data'].str.startswith(filtro_mes)] if not df_parte.empty else pd.DataFrame()
         df_rp_dir = df_rp[df_rp['data'].str.startswith(filtro_mes)] if not df_rp.empty else pd.DataFrame()
         
-        # 1. Metros por Hora (Total Metros / Qtde de horas com apontamento)
         t_metros = df_p_dir['realizado'].sum() if not df_p_dir.empty else 0
         h_perf = len(df_p_dir[df_p_dir['realizado'] > 0]) if not df_p_dir.empty else 0
         metros_h = t_metros / h_perf if h_perf > 0 else 0
         
-        # 2. Viagens por Hora
         cols_ut_dir = [c for c in df_c_dir.columns if 'ut' in c.lower()] if not df_c_dir.empty else []
         t_viag = df_c_dir[cols_ut_dir].sum().sum() if not df_c_dir.empty else 0
         h_carga = len(df_c_dir) if not df_c_dir.empty else 0
         viag_h = t_viag / h_carga if h_carga > 0 else 0
         
-        # 3. % Martelo / Motor
         pct_martelo = "N/A"
         if not df_pt_dir.empty and 'horimetro_martelo_final' in df_pt_dir.columns:
             df_perf_pt = df_pt_dir[df_pt_dir['horimetro_martelo_final'].notna()]
@@ -399,14 +425,12 @@ def tela_gestor():
                 t_martelo = (pd.to_numeric(df_perf_pt['horimetro_martelo_final']) - pd.to_numeric(df_perf_pt['horimetro_martelo_inicial'])).sum()
                 if t_motor > 0: pct_martelo = f"{(t_martelo / t_motor * 100):.1f}%"
         
-        # 4. Consumo (Abastecimentos)
         litros_total = 0
         if not df_rp_dir.empty:
             df_abast = df_rp_dir[df_rp_dir['tipo_registro'] == 'Abastecimento']
             for d in df_abast['detalhes']:
                 if isinstance(d, dict) and 'litros' in d: litros_total += float(d['litros'])
         
-        # 5. Paradas (Count)
         qtd_paradas = len(df_rp_dir[df_rp_dir['tipo_registro'] == 'Parada']) if not df_rp_dir.empty else 0
 
         c_d1, c_d2, c_d3, c_d4, c_d5 = st.columns(5)
