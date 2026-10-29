@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import calendar
 import time
+import requests
 from datetime import datetime, timedelta
 from streamlit_autorefresh import st_autorefresh
 from supabase import create_client
@@ -48,7 +49,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. CONEXÃO E ESTADO
+# 2. CONEXÃO, ESTADO E FUNÇÕES AUXILIARES
 # ==========================================
 @st.cache_resource
 def init_connection():
@@ -59,6 +60,27 @@ try:
 except Exception:
     st.error("Erro ao conectar com o banco de dados.")
     st.stop()
+
+def enviar_alerta_imediato(mensagem):
+    """Envia um alerta instantâneo para o Telegram diretamente pelo Streamlit"""
+    try:
+        # Pega as chaves diretamente do Secrets do Streamlit
+        token = st.secrets.get("TELEGRAM_TOKEN")
+        chat_id = st.secrets.get("TELEGRAM_CHAT_ID")
+        
+        if not token or not chat_id:
+            st.warning("⚠️ Chaves do Telegram não configuradas no Streamlit Secrets. Alerta visual apenas.")
+            return
+
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": mensagem,
+            "parse_mode": "HTML"
+        }
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        print(f"Erro no disparo de telegram: {e}")
 
 if "usuario" not in st.session_state: st.session_state.usuario = None
 if "perfil" not in st.session_state: st.session_state.perfil = None
@@ -189,6 +211,8 @@ def tela_operacao():
             
             if st.button("Enviar ao PCP", use_container_width=True):
                 hora_exata = datetime.now().strftime("%H:%M")
+                
+                # Salva banco de dados
                 supabase.table("registros_parciais").insert({
                     "data": data_hoje, "hora": hora_exata, "equipamento": st.session_state.tag_equipamento, 
                     "operador": st.session_state.usuario, "tipo_registro": "Checklist", "detalhes": respostas_chk
@@ -201,8 +225,21 @@ def tela_operacao():
                             "data_abertura": data_hoje, "hora_abertura": hora_exata, "equipamento": st.session_state.tag_equipamento,
                             "operador": st.session_state.usuario, "motivo": f"Checklist Crítico: {item}", "status": "ABERTA"
                         }).execute()
-                    st.warning("⚠️ OS de Manutenção aberta automaticamente por item Crítico!")
-                st.success("Checklist Enviado!")
+                    
+                # DISPARO IMEDIATO NO TELEGRAM (Atenção ou Crítico)
+                itens_anormais = {item: status for item, status in respostas_chk.items() if status in ["Atenção", "Crítico"]}
+                if itens_anormais:
+                    texto_alerta = f"⚠️ <b>ALERTA DE CHECKLIST (DESCONFORMIDADE)</b> ⚠️\n\n"
+                    texto_alerta += f"🚜 <b>Equipamento:</b> {st.session_state.tag_equipamento}\n"
+                    texto_alerta += f"👷 <b>Operador:</b> {st.session_state.usuario}\n"
+                    texto_alerta += f"⏰ <b>Hora:</b> {hora_exata}\n\n"
+                    for item, status in itens_anormais.items():
+                        icone = "🔴" if status == "Crítico" else "🟡"
+                        texto_alerta += f"{icone} <b>{item}:</b> {status}\n"
+                    enviar_alerta_imediato(texto_alerta)
+                    st.warning("⚠️ Alerta enviado à Diretoria/PCP!")
+                
+                st.success("Checklist Gravado!")
 
     with c_parada:
         with st.popover("🛑 Parada", use_container_width=True):
@@ -218,6 +255,7 @@ def tela_operacao():
                 h_fim_str = hora_fim.strftime("%H:%M")
                 detalhes_parada = {"motivo": motivo_sel, "inicio": h_ini_str, "fim": h_fim_str}
                 
+                # Salva no Supabase
                 supabase.table("registros_parciais").insert({
                     "data": data_hoje, "hora": h_ini_str, "equipamento": st.session_state.tag_equipamento, 
                     "operador": st.session_state.usuario, "tipo_registro": "Parada", "detalhes": detalhes_parada
@@ -225,7 +263,16 @@ def tela_operacao():
                 
                 tabela_gestor = "horaria_carga" if e_caminhao else "horaria_perf"
                 supabase.table(tabela_gestor).update({"causa": f"{motivo_sel} ({h_ini_str}-{h_fim_str})"}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
-                st.success("Parada registrada com a Hora Inicial vinculada!")
+                
+                # DISPARO IMEDIATO NO TELEGRAM
+                texto_parada = f"🛑 <b>ALERTA DE PARADA OPERACIONAL</b> 🛑\n\n"
+                texto_parada += f"🚜 <b>Equipamento:</b> {st.session_state.tag_equipamento}\n"
+                texto_parada += f"👷 <b>Operador:</b> {st.session_state.usuario}\n"
+                texto_parada += f"⏳ <b>Horário:</b> {h_ini_str} até {h_fim_str}\n"
+                texto_parada += f"⚠️ <b>Motivo:</b> {motivo_sel}\n"
+                enviar_alerta_imediato(texto_parada)
+                
+                st.success("Parada registrada e alerta enviado ao PCP!")
 
     with c_abastecimento:
         with st.popover("⛽ Abastecimento", use_container_width=True):
@@ -432,9 +479,6 @@ def tela_gestor():
         dia_alvo = st.date_input("📅 Selecionar Data:", datetime.today(), format="DD/MM/YYYY")
         dia_alvo_str = dia_alvo.strftime("%Y-%m-%d")
         
-        # ==========================
-        # TABELA DE CARGA (EDITÁVEL)
-        # ==========================
         st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>🚜 Operação de Carga - {dia_alvo.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
         df_carga_alvo = df_carga[df_carga['data_id'] == dia_alvo_str] if not df_carga.empty else pd.DataFrame()
         
@@ -458,16 +502,13 @@ def tela_gestor():
             tabela_excel.append(linha_dados)
         
         df_ex = pd.DataFrame(tabela_excel)
-        
         st.markdown("💡 *Clique 2x na coluna **PLANEJADO** para editar as metas por hora.*")
         colunas_bloqueadas = [c for c in df_ex.columns if c != "PLANEJADO"]
-        
         df_editado_carga = st.data_editor(df_ex, use_container_width=True, hide_index=True, disabled=colunas_bloqueadas)
         
         tot_r = int(df_editado_carga["REALIZADO"].sum()) if "REALIZADO" in df_editado_carga.columns else 0
         tot_p = int(df_editado_carga["PLANEJADO"].sum()) if "PLANEJADO" in df_editado_carga.columns else 0
         pct_t = f"{(tot_r / tot_p * 100):.0f}%" if tot_p > 0 else "0%"
-        
         st.markdown(f"<div class='linha-total'><span>TOTAL CARGA</span><span>REALIZADO: {tot_r}</span><span>PLANEJADO: {tot_p}</span><span>DESEMPENHO: {pct_t}</span></div>", unsafe_allow_html=True)
         
         if st.button("💾 Gravar Novas Metas de Carga", type="primary", use_container_width=True):
@@ -485,9 +526,6 @@ def tela_gestor():
             
         st.write("---")
         
-        # ==========================
-        # TABELA DE PERFURAÇÃO (EDITÁVEL)
-        # ==========================
         st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>🎯 Operação de Perfuração - {dia_alvo.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
         df_perf_alvo = df_perf[df_perf['data_id'] == dia_alvo_str] if not df_perf.empty else pd.DataFrame()
         
@@ -505,9 +543,7 @@ def tela_gestor():
             })
         
         df_ex_p = pd.DataFrame(tabela_perf)
-        
         st.markdown("💡 *Clique 2x na coluna **PLANEJADO** para editar as metas por hora.*")
-        
         df_editado_perf = st.data_editor(
             df_ex_p, use_container_width=True, hide_index=True,
             disabled=["HORA", "REALIZADO", "% DESEMPENHO"],
@@ -517,7 +553,6 @@ def tela_gestor():
         tot_r_p = float(df_editado_perf["REALIZADO"].sum()) if "REALIZADO" in df_editado_perf.columns else 0.0
         tot_p_p = float(df_editado_perf["PLANEJADO"].sum()) if "PLANEJADO" in df_editado_perf.columns else 0.0
         pct_t_p = f"{(tot_r_p / tot_p_p * 100):.0f}%" if tot_p_p > 0 else "0%"
-        
         st.markdown(f"<div class='linha-total'><span>TOTAL PERFURAÇÃO</span><span>REALIZADO: {tot_r_p:.1f}</span><span>PLANEJADO: {tot_p_p:.1f}</span><span>DESEMPENHO: {pct_t_p}</span></div>", unsafe_allow_html=True)
 
         if st.button("💾 Gravar Novas Metas de Perfuração", type="primary", use_container_width=True):
@@ -546,26 +581,22 @@ def tela_gestor():
         st.markdown(f"<h3 style='color:{COR_AZUL};'>Indicadores de Desempenho e Consumo (Por Setor)</h3>", unsafe_allow_html=True)
         filtro_mes = st.selectbox("Mês de Referência:", [datetime.today().strftime('%Y-%m')] + sorted(list(set(pd.to_datetime(df_rp['data']).dt.strftime('%Y-%m')) if not df_rp.empty else []), reverse=True))
         
-        # Filtros do Mês
         df_c_dir = df_carga[df_carga['data_id'].str.startswith(filtro_mes)] if not df_carga.empty else pd.DataFrame()
         df_p_dir = df_perf[df_perf['data_id'].str.startswith(filtro_mes)] if not df_perf.empty else pd.DataFrame()
         df_pt_dir = df_parte[df_parte['data'].str.startswith(filtro_mes)] if not df_parte.empty else pd.DataFrame()
         df_rp_dir = df_rp[df_rp['data'].str.startswith(filtro_mes)] if not df_rp.empty else pd.DataFrame()
         
-        # Identificar Equipamentos por Setor
         eqs_carga, eqs_perf = [], []
         if not df_eq.empty:
             eqs_carga = df_eq[df_eq['tipo'] == 'carga']['tag'].tolist()
             eqs_perf = df_eq[df_eq['tipo'] == 'perfuracao']['tag'].tolist()
         
-        # Fallback caso a tabela equipamentos falhe
         if not eqs_carga and not eqs_perf:
             eqs_todas = set(df_pt_dir['equipamento'].unique()) | set(df_rp_dir['equipamento'].unique())
             for eq in eqs_todas:
                 if 'UT' in str(eq).upper() or 'CA' in str(eq).upper(): eqs_carga.append(eq)
                 else: eqs_perf.append(eq)
 
-        # Processar Horas Rodadas e Martelo
         horas_rodadas, horas_martelo = {}, {}
         if not df_pt_dir.empty:
             for _, row in df_pt_dir.iterrows():
@@ -581,7 +612,6 @@ def tela_gestor():
                 if h_f >= h_i: horas_rodadas[eq] = horas_rodadas.get(eq, 0) + (h_f - h_i)
                 if hm_f >= hm_i: horas_martelo[eq] = horas_martelo.get(eq, 0) + (hm_f - hm_i)
 
-        # Processar Consumo e Paradas
         consumo, paradas = {}, {}
         if not df_rp_dir.empty:
             for _, row in df_rp_dir.iterrows():
@@ -593,16 +623,11 @@ def tela_gestor():
                 elif row['tipo_registro'] == 'Parada':
                     paradas[eq] = paradas.get(eq, 0) + 1
 
-        # ==========================================
-        # DASHBOARD: SETOR PRODUÇÃO (CARGA)
-        # ==========================================
         st.markdown(f"<h4 style='color:{COR_AZUL}; margin-top:20px; border-bottom: 2px solid {COR_AMARELA}; padding-bottom: 5px;'>🚜 SETOR: PRODUÇÃO (CARGA)</h4>", unsafe_allow_html=True)
-        
         cols_ut_dir = [c for c in df_c_dir.columns if 'ut' in c.lower()] if not df_c_dir.empty else []
         t_viag = df_c_dir[cols_ut_dir].sum().sum() if not df_c_dir.empty else 0
         h_carga_count = len(df_c_dir) if not df_c_dir.empty else 0
         viag_h = t_viag / h_carga_count if h_carga_count > 0 else 0
-        
         cons_carga = sum([consumo.get(eq, 0) for eq in eqs_carga])
         paradas_carga = sum([paradas.get(eq, 0) for eq in eqs_carga])
         
@@ -630,23 +655,15 @@ def tela_gestor():
                     "Média L/h": round(cons/hr, 1) if hr > 0 else 0
                 })
         
-        if tabela_carga:
-            st.dataframe(pd.DataFrame(tabela_carga), use_container_width=True, hide_index=True)
-        else:
-            st.info("Sem registos detalhados de equipamentos de carga para este mês.")
+        if tabela_carga: st.dataframe(pd.DataFrame(tabela_carga), use_container_width=True, hide_index=True)
+        else: st.info("Sem registos detalhados de equipamentos de carga para este mês.")
 
-        # ==========================================
-        # DASHBOARD: SETOR PERFURAÇÃO
-        # ==========================================
         st.markdown(f"<h4 style='color:{COR_AZUL}; margin-top:30px; border-bottom: 2px solid {COR_AMARELA}; padding-bottom: 5px;'>🎯 SETOR: PERFURAÇÃO</h4>", unsafe_allow_html=True)
-        
         t_metros = df_p_dir['realizado'].sum() if not df_p_dir.empty else 0
         h_perf_count = len(df_p_dir[df_p_dir['realizado'] > 0]) if not df_p_dir.empty else 0
         metros_h = t_metros / h_perf_count if h_perf_count > 0 else 0
-        
         cons_perf = sum([consumo.get(eq, 0) for eq in eqs_perf])
         paradas_perf = sum([paradas.get(eq, 0) for eq in eqs_perf])
-        
         t_mot_perf = sum([horas_rodadas.get(eq, 0) for eq in eqs_perf])
         t_mar_perf = sum([horas_martelo.get(eq, 0) for eq in eqs_perf])
         pct_martelo = f"{(t_mar_perf / t_mot_perf * 100):.1f}%" if t_mot_perf > 0 else "N/A"
@@ -672,10 +689,8 @@ def tela_gestor():
                     "Média L/h": round(cons/hr, 1) if hr > 0 else 0
                 })
                 
-        if tabela_perf:
-            st.dataframe(pd.DataFrame(tabela_perf).style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
-        else:
-            st.info("Sem registos detalhados de equipamentos de perfuração para este mês.")
+        if tabela_perf: st.dataframe(pd.DataFrame(tabela_perf).style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
+        else: st.info("Sem registos detalhados de equipamentos de perfuração para este mês.")
 
     with aba_dados:
         c_t1, c_t2, c_t3, c_t4 = st.tabs(["Carga", "Perfuração", "Fechamentos", "Registros Parciais"])
