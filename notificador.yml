@@ -23,8 +23,8 @@ jobs:
 
       - name: Rodar Notificador
         env:
-          SUPABASE_URL: ${{ https://sfvbwgmwyrfsnmehsjbt.supabase.co }}
-          SUPABASE_KEY: ${{ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmdmJ3Z213eXJmc25tZWhzamJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxMTIxMzcsImV4cCI6MjEwODY4ODEzN30.7o4pfXEAjBLuzJ598djf-VsdZ7-qj0fvePOn369REPM }}
-          TELEGRAM_TOKEN: ${{ 9173339893:AAEkHZAnv3_3k6yPDpQePLV_G6QK-aZ3KzA }}
-          TELEGRAM_CHAT_ID: ${{ -1005093522724 }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python notificador.py
