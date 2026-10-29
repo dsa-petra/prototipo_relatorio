@@ -64,7 +64,6 @@ except Exception:
 def enviar_alerta_imediato(mensagem):
     """Envia um alerta instantâneo para o Telegram diretamente pelo Streamlit"""
     try:
-        # Pega as chaves diretamente do Secrets do Streamlit
         token = st.secrets.get("TELEGRAM_TOKEN")
         chat_id = st.secrets.get("TELEGRAM_CHAT_ID")
         
@@ -212,7 +211,6 @@ def tela_operacao():
             if st.button("Enviar ao PCP", use_container_width=True):
                 hora_exata = datetime.now().strftime("%H:%M")
                 
-                # Salva banco de dados
                 supabase.table("registros_parciais").insert({
                     "data": data_hoje, "hora": hora_exata, "equipamento": st.session_state.tag_equipamento, 
                     "operador": st.session_state.usuario, "tipo_registro": "Checklist", "detalhes": respostas_chk
@@ -226,7 +224,6 @@ def tela_operacao():
                             "operador": st.session_state.usuario, "motivo": f"Checklist Crítico: {item}", "status": "ABERTA"
                         }).execute()
                     
-                # DISPARO IMEDIATO NO TELEGRAM (Atenção ou Crítico)
                 itens_anormais = {item: status for item, status in respostas_chk.items() if status in ["Atenção", "Crítico"]}
                 if itens_anormais:
                     texto_alerta = f"⚠️ <b>ALERTA DE CHECKLIST (DESCONFORMIDADE)</b> ⚠️\n\n"
@@ -243,9 +240,13 @@ def tela_operacao():
 
     with c_parada:
         with st.popover("🛑 Parada", use_container_width=True):
+            # NOVO: Seleção do TIPO de parada conforme pedido
+            tipo_parada = st.selectbox("Classificação:", ["Operacional", "Mecânica", "Elétrica", "Evento Natural"])
+            
             res_par = supabase.table("motivos_parada").select("motivo").in_("tipo_equipamento", [st.session_state.tipo_equipamento, 'ambos']).execute()
             opcoes_parada = [m['motivo'] for m in res_par.data] if res_par.data else ["Nenhuma"]
-            motivo_sel = st.selectbox("Motivo:", opcoes_parada)
+            motivo_sel = st.selectbox("Detalhe/Motivo:", opcoes_parada)
+            
             c_h1, c_h2 = st.columns(2)
             hora_inicio = c_h1.time_input("Início da Parada")
             hora_fim = c_h2.time_input("Fim da Parada")
@@ -253,7 +254,7 @@ def tela_operacao():
             if st.button("Avisar PCP", use_container_width=True):
                 h_ini_str = hora_inicio.strftime("%H:%M")
                 h_fim_str = hora_fim.strftime("%H:%M")
-                detalhes_parada = {"motivo": motivo_sel, "inicio": h_ini_str, "fim": h_fim_str}
+                detalhes_parada = {"tipo": tipo_parada, "motivo": motivo_sel, "inicio": h_ini_str, "fim": h_fim_str}
                 
                 # Salva no Supabase
                 supabase.table("registros_parciais").insert({
@@ -262,14 +263,15 @@ def tela_operacao():
                 }).execute()
                 
                 tabela_gestor = "horaria_carga" if e_caminhao else "horaria_perf"
-                supabase.table(tabela_gestor).update({"causa": f"{motivo_sel} ({h_ini_str}-{h_fim_str})"}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
+                supabase.table(tabela_gestor).update({"causa": f"{tipo_parada}: {motivo_sel} ({h_ini_str}-{h_fim_str})"}).eq("data_id", data_hoje).eq("hora", slot_atual).execute()
                 
                 # DISPARO IMEDIATO NO TELEGRAM
                 texto_parada = f"🛑 <b>ALERTA DE PARADA OPERACIONAL</b> 🛑\n\n"
                 texto_parada += f"🚜 <b>Equipamento:</b> {st.session_state.tag_equipamento}\n"
                 texto_parada += f"👷 <b>Operador:</b> {st.session_state.usuario}\n"
+                texto_parada += f"⚠️ <b>Classificação:</b> {tipo_parada}\n"
+                texto_parada += f"📝 <b>Motivo:</b> {motivo_sel}\n"
                 texto_parada += f"⏳ <b>Horário:</b> {h_ini_str} até {h_fim_str}\n"
-                texto_parada += f"⚠️ <b>Motivo:</b> {motivo_sel}\n"
                 enviar_alerta_imediato(texto_parada)
                 
                 st.success("Parada registrada e alerta enviado ao PCP!")
@@ -472,6 +474,32 @@ def tela_gestor():
     c1.markdown(f"<div class='kpi-card'><p class='kpi-title'>Viagens (Realizado / Planejado) Hoje</p><p class='kpi-value'>🚛 {int(total_viagens)} / {int(meta_viagens)}</p></div>", unsafe_allow_html=True)
     c2.markdown(f"<div class='kpi-card'><p class='kpi-title'>Metros (Realizado / Planejado) Hoje</p><p class='kpi-value'>🎯 {total_metros:.1f} / {meta_metros:.1f}</p></div>", unsafe_allow_html=True)
     st.write("") 
+
+    # ==========================================
+    # 🚨 ALERTAS DE PARADA DO DIA
+    # ==========================================
+    df_rp_hoje = df_rp[df_rp['data'] == data_hoje_str] if not df_rp.empty else pd.DataFrame()
+    df_paradas = df_rp_hoje[df_rp_hoje['tipo_registro'] == 'Parada'] if not df_rp_hoje.empty else pd.DataFrame()
+    
+    if not df_paradas.empty:
+        st.markdown("<h4 style='color: #d32f2f; margin-top: 10px;'>🚨 Alertas de Parada (Hoje)</h4>", unsafe_allow_html=True)
+        for _, row in df_paradas.iterrows():
+            det = row['detalhes'] if isinstance(row['detalhes'], dict) else {}
+            tag = row['equipamento']
+            t_ini = det.get('inicio', '--:--')
+            t_fim = det.get('fim', '--:--')
+            t_tipo = det.get('tipo', 'Não Especificado')
+            t_motivo = det.get('motivo', '')
+            
+            st.markdown(f"""
+            <div style='background-color: #ffebee; border-left: 5px solid #f44336; padding: 12px; border-radius: 5px; margin-bottom: 8px; color: #b71c1c; display: flex; justify-content: space-between; align-items: center;'>
+                <div style='font-size: 16px;'><strong>🚜 TAG:</strong> {tag}</div>
+                <div style='font-size: 16px;'><strong>⚠️ Tipo:</strong> {t_tipo} <em>({t_motivo})</em></div>
+                <div style='font-size: 16px;'><strong>⏱️ Início:</strong> {t_ini}</div>
+                <div style='font-size: 16px;'><strong>⏳ Fim:</strong> {t_fim}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        st.write("")
 
     aba_pcp, aba_manutencao, aba_diretoria, aba_dados, aba_config = st.tabs(["📋 Acompanhamento Diário", "🔧 Manutenção (OS)", "📊 Visão Diretoria", "🗄️ Dados Brutos", "🛠️ Cadastros"])
 
@@ -760,3 +788,5 @@ if st.session_state.tela_atual == "login": tela_login()
 elif st.session_state.tela_atual == "selecao_maquina": tela_selecao_maquina()
 elif st.session_state.tela_atual == "operacao": tela_operacao()
 elif st.session_state.tela_atual == "gestor" and st.session_state.perfil == "gestor": tela_gestor()
+
+
