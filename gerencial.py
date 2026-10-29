@@ -95,6 +95,7 @@ def carregar_dados_gestor():
     df_pt = pd.DataFrame(supabase.table("parte_diaria").select("*").execute().data)
     df_rp = pd.DataFrame(supabase.table("registros_parciais").select("*").execute().data)
     df_os = pd.DataFrame(supabase.table("ordens_servico").select("*").execute().data)
+    df_eq = pd.DataFrame(supabase.table("equipamentos").select("*").execute().data)
     
     if not df_c.empty and 'data_id' in df_c.columns: df_c['data_id'] = df_c['data_id'].astype(str)
     if not df_p.empty and 'data_id' in df_p.columns: df_p['data_id'] = df_p['data_id'].astype(str)
@@ -102,7 +103,12 @@ def carregar_dados_gestor():
     if not df_rp.empty and 'data' in df_rp.columns: df_rp['data'] = df_rp['data'].astype(str)
     if not df_os.empty and 'data_abertura' in df_os.columns: df_os['data_abertura'] = df_os['data_abertura'].astype(str)
     
-    return df_c, df_p, df_pt, df_rp, df_os
+    return df_c, df_p, df_pt, df_rp, df_os, df_eq
+
+def destacar_linha_total(row):
+    if row.get('HORA') == 'TOTAL' or row.get('Equipamento') == 'TOTAL':
+        return ['background-color: #334155; font-weight: bold; color: #ffc107'] * len(row)
+    return [''] * len(row)
 
 # ==========================================
 # 3. TELAS DO SISTEMA
@@ -402,7 +408,7 @@ def tela_gestor():
         st.markdown(f"<h1 style='color: {COR_AZUL};'>📊 Painel de Controle - Operação</h1>", unsafe_allow_html=True)
     st.divider()
 
-    df_carga, df_perf, df_parte, df_rp, df_os = carregar_dados_gestor()
+    df_carga, df_perf, df_parte, df_rp, df_os, df_eq = carregar_dados_gestor()
     data_hoje_str = datetime.today().strftime('%Y-%m-%d')
     
     # Cálculos KPI Hoje
@@ -416,8 +422,8 @@ def tela_gestor():
     meta_metros = df_perf_hoje['meta'].sum() if not df_perf_hoje.empty else 0
 
     c1, c2 = st.columns(2)
-    c1.markdown(f"<div class='kpi-card'><p class='kpi-title'>Viagens (Realizado / Planejado)</p><p class='kpi-value'>🚛 {int(total_viagens)} / {int(meta_viagens)}</p></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='kpi-card'><p class='kpi-title'>Metros (Realizado / Planejado)</p><p class='kpi-value'>🎯 {total_metros:.1f} / {meta_metros:.1f}</p></div>", unsafe_allow_html=True)
+    c1.markdown(f"<div class='kpi-card'><p class='kpi-title'>Viagens (Realizado / Planejado) Hoje</p><p class='kpi-value'>🚛 {int(total_viagens)} / {int(meta_viagens)}</p></div>", unsafe_allow_html=True)
+    c2.markdown(f"<div class='kpi-card'><p class='kpi-title'>Metros (Realizado / Planejado) Hoje</p><p class='kpi-value'>🎯 {total_metros:.1f} / {meta_metros:.1f}</p></div>", unsafe_allow_html=True)
     st.write("") 
 
     aba_pcp, aba_manutencao, aba_diretoria, aba_dados, aba_config = st.tabs(["📋 Acompanhamento Diário", "🔧 Manutenção (OS)", "📊 Visão Diretoria", "🗄️ Dados Brutos", "🛠️ Cadastros"])
@@ -456,16 +462,10 @@ def tela_gestor():
         st.markdown("💡 *Clique 2x na coluna **PLANEJADO** para editar as metas por hora.*")
         colunas_bloqueadas = [c for c in df_ex.columns if c != "PLANEJADO"]
         
-        df_editado_carga = st.data_editor(
-            df_ex,
-            use_container_width=True,
-            hide_index=True,
-            disabled=colunas_bloqueadas
-        )
+        df_editado_carga = st.data_editor(df_ex, use_container_width=True, hide_index=True, disabled=colunas_bloqueadas)
         
-        # Totalizador Dinâmico (Fora da tabela para não quebrar a edição)
-        tot_r = int(df_editado_carga["REALIZADO"].sum())
-        tot_p = int(df_editado_carga["PLANEJADO"].sum())
+        tot_r = int(df_editado_carga["REALIZADO"].sum()) if "REALIZADO" in df_editado_carga.columns else 0
+        tot_p = int(df_editado_carga["PLANEJADO"].sum()) if "PLANEJADO" in df_editado_carga.columns else 0
         pct_t = f"{(tot_r / tot_p * 100):.0f}%" if tot_p > 0 else "0%"
         
         st.markdown(f"<div class='linha-total'><span>TOTAL CARGA</span><span>REALIZADO: {tot_r}</span><span>PLANEJADO: {tot_p}</span><span>DESEMPENHO: {pct_t}</span></div>", unsafe_allow_html=True)
@@ -509,18 +509,13 @@ def tela_gestor():
         st.markdown("💡 *Clique 2x na coluna **PLANEJADO** para editar as metas por hora.*")
         
         df_editado_perf = st.data_editor(
-            df_ex_p,
-            use_container_width=True,
-            hide_index=True,
+            df_ex_p, use_container_width=True, hide_index=True,
             disabled=["HORA", "REALIZADO", "% DESEMPENHO"],
-            column_config={
-                "REALIZADO": st.column_config.NumberColumn(format="%.1f m"),
-                "PLANEJADO": st.column_config.NumberColumn(format="%.1f")
-            }
+            column_config={"REALIZADO": st.column_config.NumberColumn(format="%.1f m"), "PLANEJADO": st.column_config.NumberColumn(format="%.1f")}
         )
         
-        tot_r_p = float(df_editado_perf["REALIZADO"].sum())
-        tot_p_p = float(df_editado_perf["PLANEJADO"].sum())
+        tot_r_p = float(df_editado_perf["REALIZADO"].sum()) if "REALIZADO" in df_editado_perf.columns else 0.0
+        tot_p_p = float(df_editado_perf["PLANEJADO"].sum()) if "PLANEJADO" in df_editado_perf.columns else 0.0
         pct_t_p = f"{(tot_r_p / tot_p_p * 100):.0f}%" if tot_p_p > 0 else "0%"
         
         st.markdown(f"<div class='linha-total'><span>TOTAL PERFURAÇÃO</span><span>REALIZADO: {tot_r_p:.1f}</span><span>PLANEJADO: {tot_p_p:.1f}</span><span>DESEMPENHO: {pct_t_p}</span></div>", unsafe_allow_html=True)
@@ -541,7 +536,6 @@ def tela_gestor():
     with aba_manutencao:
         st.markdown(f"<h3 style='color:{COR_AZUL}; text-align:center;'>🔧 Central de Ordens de Serviço (OS)</h3>", unsafe_allow_html=True)
         st.write("Ordens de serviço abertas automaticamente por checklist crítico ou paradas operacionais, ou abertas manualmente.")
-        
         if not df_os.empty:
             df_os = df_os.sort_values(by='id', ascending=False)
             st.dataframe(df_os, use_container_width=True, hide_index=True)
@@ -549,45 +543,139 @@ def tela_gestor():
             st.info("Nenhuma Ordem de Serviço registrada no momento.")
 
     with aba_diretoria:
-        st.markdown(f"<h3 style='color:{COR_AZUL};'>Indicadores de Desempenho</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color:{COR_AZUL};'>Indicadores de Desempenho e Consumo (Por Setor)</h3>", unsafe_allow_html=True)
         filtro_mes = st.selectbox("Mês de Referência:", [datetime.today().strftime('%Y-%m')] + sorted(list(set(pd.to_datetime(df_rp['data']).dt.strftime('%Y-%m')) if not df_rp.empty else []), reverse=True))
         
+        # Filtros do Mês
         df_c_dir = df_carga[df_carga['data_id'].str.startswith(filtro_mes)] if not df_carga.empty else pd.DataFrame()
         df_p_dir = df_perf[df_perf['data_id'].str.startswith(filtro_mes)] if not df_perf.empty else pd.DataFrame()
         df_pt_dir = df_parte[df_parte['data'].str.startswith(filtro_mes)] if not df_parte.empty else pd.DataFrame()
         df_rp_dir = df_rp[df_rp['data'].str.startswith(filtro_mes)] if not df_rp.empty else pd.DataFrame()
         
-        t_metros = df_p_dir['realizado'].sum() if not df_p_dir.empty else 0
-        h_perf = len(df_p_dir[df_p_dir['realizado'] > 0]) if not df_p_dir.empty else 0
-        metros_h = t_metros / h_perf if h_perf > 0 else 0
+        # Identificar Equipamentos por Setor
+        eqs_carga, eqs_perf = [], []
+        if not df_eq.empty:
+            eqs_carga = df_eq[df_eq['tipo'] == 'carga']['tag'].tolist()
+            eqs_perf = df_eq[df_eq['tipo'] == 'perfuracao']['tag'].tolist()
+        
+        # Fallback caso a tabela equipamentos falhe
+        if not eqs_carga and not eqs_perf:
+            eqs_todas = set(df_pt_dir['equipamento'].unique()) | set(df_rp_dir['equipamento'].unique())
+            for eq in eqs_todas:
+                if 'UT' in str(eq).upper() or 'CA' in str(eq).upper(): eqs_carga.append(eq)
+                else: eqs_perf.append(eq)
+
+        # Processar Horas Rodadas e Martelo
+        horas_rodadas, horas_martelo = {}, {}
+        if not df_pt_dir.empty:
+            for _, row in df_pt_dir.iterrows():
+                eq = row['equipamento']
+                h_i = pd.to_numeric(row.get('horimetro_inicial', 0), errors='coerce')
+                h_f = pd.to_numeric(row.get('horimetro_final', 0), errors='coerce')
+                hm_i = pd.to_numeric(row.get('horimetro_martelo_inicial', 0), errors='coerce')
+                hm_f = pd.to_numeric(row.get('horimetro_martelo_final', 0), errors='coerce')
+                
+                h_i = h_i if pd.notna(h_i) else 0; h_f = h_f if pd.notna(h_f) else 0
+                hm_i = hm_i if pd.notna(hm_i) else 0; hm_f = hm_f if pd.notna(hm_f) else 0
+                
+                if h_f >= h_i: horas_rodadas[eq] = horas_rodadas.get(eq, 0) + (h_f - h_i)
+                if hm_f >= hm_i: horas_martelo[eq] = horas_martelo.get(eq, 0) + (hm_f - hm_i)
+
+        # Processar Consumo e Paradas
+        consumo, paradas = {}, {}
+        if not df_rp_dir.empty:
+            for _, row in df_rp_dir.iterrows():
+                eq = row['equipamento']
+                if row['tipo_registro'] == 'Abastecimento':
+                    det = row['detalhes']
+                    if isinstance(det, dict) and 'litros' in det:
+                        consumo[eq] = consumo.get(eq, 0) + float(det['litros'])
+                elif row['tipo_registro'] == 'Parada':
+                    paradas[eq] = paradas.get(eq, 0) + 1
+
+        # ==========================================
+        # DASHBOARD: SETOR PRODUÇÃO (CARGA)
+        # ==========================================
+        st.markdown(f"<h4 style='color:{COR_AZUL}; margin-top:20px; border-bottom: 2px solid {COR_AMARELA}; padding-bottom: 5px;'>🚜 SETOR: PRODUÇÃO (CARGA)</h4>", unsafe_allow_html=True)
         
         cols_ut_dir = [c for c in df_c_dir.columns if 'ut' in c.lower()] if not df_c_dir.empty else []
         t_viag = df_c_dir[cols_ut_dir].sum().sum() if not df_c_dir.empty else 0
-        h_carga = len(df_c_dir) if not df_c_dir.empty else 0
-        viag_h = t_viag / h_carga if h_carga > 0 else 0
+        h_carga_count = len(df_c_dir) if not df_c_dir.empty else 0
+        viag_h = t_viag / h_carga_count if h_carga_count > 0 else 0
         
-        pct_martelo = "N/A"
-        if not df_pt_dir.empty and 'horimetro_martelo_final' in df_pt_dir.columns:
-            df_perf_pt = df_pt_dir[df_pt_dir['horimetro_martelo_final'].notna()]
-            if not df_perf_pt.empty:
-                t_motor = (pd.to_numeric(df_perf_pt['horimetro_final']) - pd.to_numeric(df_perf_pt['horimetro_inicial'])).sum()
-                t_martelo = (pd.to_numeric(df_perf_pt['horimetro_martelo_final']) - pd.to_numeric(df_perf_pt['horimetro_martelo_inicial'])).sum()
-                if t_motor > 0: pct_martelo = f"{(t_martelo / t_motor * 100):.1f}%"
+        cons_carga = sum([consumo.get(eq, 0) for eq in eqs_carga])
+        paradas_carga = sum([paradas.get(eq, 0) for eq in eqs_carga])
         
-        litros_total = 0
-        if not df_rp_dir.empty:
-            df_abast = df_rp_dir[df_rp_dir['tipo_registro'] == 'Abastecimento']
-            for d in df_abast['detalhes']:
-                if isinstance(d, dict) and 'litros' in d: litros_total += float(d['litros'])
+        cc1, cc2, cc3, cc4 = st.columns(4)
+        cc1.markdown(f"<div class='dir-card'><div class='dir-titulo'>Viagens / Hora</div><div class='dir-valor'>{viag_h:.1f} v/h</div></div>", unsafe_allow_html=True)
+        cc2.markdown(f"<div class='dir-card'><div class='dir-titulo'>Total Viagens (Mês)</div><div class='dir-valor'>{int(t_viag)}</div></div>", unsafe_allow_html=True)
+        cc3.markdown(f"<div class='dir-card'><div class='dir-titulo'>Consumo Combustível (Setor)</div><div class='dir-valor'>{cons_carga:,.0f} L</div></div>", unsafe_allow_html=True)
+        cc4.markdown(f"<div class='dir-card'><div class='dir-titulo'>Ocorrências de Parada</div><div class='dir-valor'>{paradas_carga}</div></div>", unsafe_allow_html=True)
         
-        qtd_paradas = len(df_rp_dir[df_rp_dir['tipo_registro'] == 'Parada']) if not df_rp_dir.empty else 0
+        tabela_carga = []
+        for eq in eqs_carga:
+            hr = horas_rodadas.get(eq, 0)
+            cons = consumo.get(eq, 0)
+            v_tot = 0
+            if not df_c_dir.empty:
+                col_eq = eq.lower().replace("-", "")
+                if col_eq in df_c_dir.columns: v_tot = int(df_c_dir[col_eq].sum())
+                
+            if hr > 0 or cons > 0 or v_tot > 0:
+                tabela_carga.append({
+                    "Equipamento": eq,
+                    "Viagens Realizadas": v_tot,
+                    "Horas Rodadas (Motor)": round(hr, 1),
+                    "Consumo Total (Litros)": cons,
+                    "Média L/h": round(cons/hr, 1) if hr > 0 else 0
+                })
+        
+        if tabela_carga:
+            st.dataframe(pd.DataFrame(tabela_carga), use_container_width=True, hide_index=True)
+        else:
+            st.info("Sem registos detalhados de equipamentos de carga para este mês.")
 
-        c_d1, c_d2, c_d3, c_d4, c_d5 = st.columns(5)
-        c_d1.markdown(f"<div class='dir-card'><div class='dir-titulo'>Metros / Hora</div><div class='dir-valor'>{metros_h:.1f} m/h</div></div>", unsafe_allow_html=True)
-        c_d2.markdown(f"<div class='dir-card'><div class='dir-titulo'>Viagens / Hora</div><div class='dir-valor'>{viag_h:.1f} v/h</div></div>", unsafe_allow_html=True)
-        c_d3.markdown(f"<div class='dir-card'><div class='dir-titulo'>% Utilização Martelo</div><div class='dir-valor'>{pct_martelo}</div></div>", unsafe_allow_html=True)
-        c_d4.markdown(f"<div class='dir-card'><div class='dir-titulo'>Consumo Combustível</div><div class='dir-valor'>{litros_total:,.0f} L</div></div>", unsafe_allow_html=True)
-        c_d5.markdown(f"<div class='dir-card'><div class='dir-titulo'>Ocorrências de Parada</div><div class='dir-valor'>{qtd_paradas}</div></div>", unsafe_allow_html=True)
+        # ==========================================
+        # DASHBOARD: SETOR PERFURAÇÃO
+        # ==========================================
+        st.markdown(f"<h4 style='color:{COR_AZUL}; margin-top:30px; border-bottom: 2px solid {COR_AMARELA}; padding-bottom: 5px;'>🎯 SETOR: PERFURAÇÃO</h4>", unsafe_allow_html=True)
+        
+        t_metros = df_p_dir['realizado'].sum() if not df_p_dir.empty else 0
+        h_perf_count = len(df_p_dir[df_p_dir['realizado'] > 0]) if not df_p_dir.empty else 0
+        metros_h = t_metros / h_perf_count if h_perf_count > 0 else 0
+        
+        cons_perf = sum([consumo.get(eq, 0) for eq in eqs_perf])
+        paradas_perf = sum([paradas.get(eq, 0) for eq in eqs_perf])
+        
+        t_mot_perf = sum([horas_rodadas.get(eq, 0) for eq in eqs_perf])
+        t_mar_perf = sum([horas_martelo.get(eq, 0) for eq in eqs_perf])
+        pct_martelo = f"{(t_mar_perf / t_mot_perf * 100):.1f}%" if t_mot_perf > 0 else "N/A"
+        
+        cp1, cp2, cp3, cp4 = st.columns(4)
+        cp1.markdown(f"<div class='dir-card'><div class='dir-titulo'>Metros / Hora</div><div class='dir-valor'>{metros_h:.1f} m/h</div></div>", unsafe_allow_html=True)
+        cp2.markdown(f"<div class='dir-card'><div class='dir-titulo'>Total Metros (Mês)</div><div class='dir-valor'>{t_metros:.1f} m</div></div>", unsafe_allow_html=True)
+        cp3.markdown(f"<div class='dir-card'><div class='dir-titulo'>Consumo Combustível (Setor)</div><div class='dir-valor'>{cons_perf:,.0f} L</div></div>", unsafe_allow_html=True)
+        cp4.markdown(f"<div class='dir-card'><div class='dir-titulo'>% Utilização Martelo Global</div><div class='dir-valor'>{pct_martelo}</div></div>", unsafe_allow_html=True)
+
+        tabela_perf = []
+        for eq in eqs_perf:
+            hr = horas_rodadas.get(eq, 0)
+            hm = horas_martelo.get(eq, 0)
+            cons = consumo.get(eq, 0)
+            if hr > 0 or hm > 0 or cons > 0:
+                tabela_perf.append({
+                    "Equipamento": eq,
+                    "Horas Rodadas (Motor)": round(hr, 1),
+                    "Horas Martelo": round(hm, 1),
+                    "% Martelo": f"{(hm/hr*100):.1f}%" if hr > 0 else "0%",
+                    "Consumo Total (Litros)": cons,
+                    "Média L/h": round(cons/hr, 1) if hr > 0 else 0
+                })
+                
+        if tabela_perf:
+            st.dataframe(pd.DataFrame(tabela_perf).style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
+        else:
+            st.info("Sem registos detalhados de equipamentos de perfuração para este mês.")
 
     with aba_dados:
         c_t1, c_t2, c_t3, c_t4 = st.tabs(["Carga", "Perfuração", "Fechamentos", "Registros Parciais"])
