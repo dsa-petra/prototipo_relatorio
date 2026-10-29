@@ -93,6 +93,14 @@ def carregar_dados_gestor():
     df_pt = pd.DataFrame(supabase.table("parte_diaria").select("*").execute().data)
     df_rp = pd.DataFrame(supabase.table("registros_parciais").select("*").execute().data)
     df_os = pd.DataFrame(supabase.table("ordens_servico").select("*").execute().data)
+    
+    # FORÇAR CONVERSÃO DE DATAS PARA STRING PARA EVITAR BUGS DE FILTRO DO PANDAS
+    if not df_c.empty and 'data_id' in df_c.columns: df_c['data_id'] = df_c['data_id'].astype(str)
+    if not df_p.empty and 'data_id' in df_p.columns: df_p['data_id'] = df_p['data_id'].astype(str)
+    if not df_pt.empty and 'data' in df_pt.columns: df_pt['data'] = df_pt['data'].astype(str)
+    if not df_rp.empty and 'data' in df_rp.columns: df_rp['data'] = df_rp['data'].astype(str)
+    if not df_os.empty and 'data_abertura' in df_os.columns: df_os['data_abertura'] = df_os['data_abertura'].astype(str)
+    
     return df_c, df_p, df_pt, df_rp, df_os
 
 def destacar_linha_total(row):
@@ -170,9 +178,6 @@ def tela_operacao():
         st.session_state.incremento_val = 0
         st.rerun()
 
-    # ==========================
-    # FORMULÁRIOS SECUNDÁRIOS
-    # ==========================
     c_check, c_parada, c_abastecimento = st.columns(3)
     
     with c_check:
@@ -360,21 +365,30 @@ def tela_operacao():
         
         if not df_op_perf.empty:
             tabela_perf = []
-            totais_p = {"REALIZADO": 0, "PLANEJADO": 0}
+            totais_p = {"REALIZADO": 0.0, "PLANEJADO": 0.0}
             
             for hora in HORARIOS_TURNO:
                 linha = df_op_perf[df_op_perf['hora'] == hora]
                 realizado_p = float(linha.iloc[0]['realizado']) if not linha.empty else 0.0
                 meta_p = float(linha.iloc[0]['meta']) if not linha.empty else 0.0
                 
-                tabela_perf.append({"HORA": INTERVALOS[hora], "REALIZADO": realizado_p, "PLANEJADO": meta_p, "% DESEMPENHO": f"{(realizado_p / meta_p * 100):.0f}%" if meta_p > 0 else "0%"})
+                tabela_perf.append({
+                    "HORA": INTERVALOS[hora], 
+                    "REALIZADO": f"{realizado_p:.1f}", 
+                    "PLANEJADO": f"{meta_p:.1f}", 
+                    "% DESEMPENHO": f"{(realizado_p / meta_p * 100):.0f}%" if meta_p > 0 else "0%"
+                })
                 totais_p["REALIZADO"] += realizado_p
                 totais_p["PLANEJADO"] += meta_p
             
-            tabela_perf.append({"HORA": "TOTAL", "REALIZADO": totais_p["REALIZADO"], "PLANEJADO": totais_p["PLANEJADO"], "% DESEMPENHO": f"{(totais_p['REALIZADO'] / totais_p['PLANEJADO'] * 100):.0f}%" if totais_p["PLANEJADO"] > 0 else "0%"})
+            tabela_perf.append({
+                "HORA": "TOTAL", 
+                "REALIZADO": f"{totais_p['REALIZADO']:.1f}", 
+                "PLANEJADO": f"{totais_p['PLANEJADO']:.1f}", 
+                "% DESEMPENHO": f"{(totais_p['REALIZADO'] / totais_p['PLANEJADO'] * 100):.0f}%" if totais_p["PLANEJADO"] > 0 else "0%"
+            })
             
             df_ex_p = pd.DataFrame(tabela_perf)
-            df_ex_p['REALIZADO'] = df_ex_p['REALIZADO'].apply(lambda x: f"{x:.1f}" if isinstance(x, float) else x)
             st.dataframe(df_ex_p.style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
         else:
             st.info("Ainda não existem registos de perfuração para o dia de hoje.")
@@ -517,21 +531,30 @@ def tela_gestor():
         
         if not df_perf_alvo.empty:
             tabela_perf = []
-            totais_p = {"REALIZADO": 0, "PLANEJADO": 0}
+            totais_p = {"REALIZADO": 0.0, "PLANEJADO": 0.0}
             
             for hora in HORARIOS_TURNO:
                 linha = df_perf_alvo[df_perf_alvo['hora'] == hora]
                 realizado_p = float(linha.iloc[0]['realizado']) if not linha.empty else 0.0
                 meta_p = float(linha.iloc[0]['meta']) if not linha.empty else 0.0
                 
-                tabela_perf.append({"HORA": INTERVALOS[hora], "REALIZADO": realizado_p, "PLANEJADO": meta_p, "% DESEMPENHO": f"{(realizado_p / meta_p * 100):.0f}%" if meta_p > 0 else "0%"})
+                tabela_perf.append({
+                    "HORA": INTERVALOS[hora], 
+                    "REALIZADO": f"{realizado_p:.1f}", 
+                    "PLANEJADO": f"{meta_p:.1f}", 
+                    "% DESEMPENHO": f"{(realizado_p / meta_p * 100):.0f}%" if meta_p > 0 else "0%"
+                })
                 totais_p["REALIZADO"] += realizado_p
                 totais_p["PLANEJADO"] += meta_p
             
-            tabela_perf.append({"HORA": "TOTAL", "REALIZADO": totais_p["REALIZADO"], "PLANEJADO": totais_p["PLANEJADO"], "% DESEMPENHO": f"{(totais_p['REALIZADO'] / totais_p['PLANEJADO'] * 100):.0f}%" if totais_p["PLANEJADO"] > 0 else "0%"})
+            tabela_perf.append({
+                "HORA": "TOTAL", 
+                "REALIZADO": f"{totais_p['REALIZADO']:.1f}", 
+                "PLANEJADO": f"{totais_p['PLANEJADO']:.1f}", 
+                "% DESEMPENHO": f"{(totais_p['REALIZADO'] / totais_p['PLANEJADO'] * 100):.0f}%" if totais_p["PLANEJADO"] > 0 else "0%"
+            })
             
             df_ex_p = pd.DataFrame(tabela_perf)
-            df_ex_p['REALIZADO'] = df_ex_p['REALIZADO'].apply(lambda x: f"{x:.1f}" if isinstance(x, float) else x)
             st.dataframe(df_ex_p.style.apply(destacar_linha_total, axis=1), use_container_width=True, hide_index=True)
         else: st.warning("Sem dados de perfuração para o dia selecionado.")
 
