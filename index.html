@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mining SaaS - PCP Operacional de Mineração</title>
   
-  <!-- Tailwind & Fontes -->
-  <script type="text/javascript" src="https://gc.kes.v2.scr.kaspersky-labs.com/7EA5E9BB-55E1-4C31-9C21-4943DDFED2E4/main.js?attr=ItOkuCgn9YhEF4owQxs3fFYdmKz0e6gKRBd6EvU7Zx2xWlgZAmnZFDkIhKsuxzpLY1s5aBlf6MmqwM19dHU-hAUNMFxu6NdFl4D5yehKM43mZVmXENWKlcpBRzD-35QcyXSmrDVLe8cIX3iWDBUqywtuTU_d-3-VlEpENnurIbL_Z_hlHC_3gPRKghVoYBxfmRJ5s6MC8YuVt5mp_GwUL3R6bPfLVt24QFcNywFVBYaz4gEqV6gIMh2nKdr6y2Ppej6Ae4zIQW1_EHMgjKICT3WJlSOfUAFdpaH65btRM_4NAoUYxXvVI2D8JqWlmsVw" charset="UTF-8"></script><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script type="text/javascript" src="https://gc.kes.v2.scr.kaspersky-labs.com/7EA5E9BB-55E1-4C31-9C21-4943DDFED2E4/main.js?attr=3vagDOEzEP4YTnxoJjmPuGDNE8WvxOjbIL_JzcOHKTu9-CLotqwnM51PaDhsU8ssJGjG7tj8pTjgbDmQ0uWpoKI5USOh_5lPWShEnUIqhj24OaA2vu-Avwq5raWkWuS0RIwSOCWeFYLxGOYKAh4RW22amAijbtItpWxg3dcyoBcFmoFT6_Sp-O0jpRXHGZnju4rztnr_pUk96ckuk-Oec9Gwl_X8YgmHFNUHt1xAvinqWwkmhraGqFjTYdWZxLydRTcaF--e63hG0EtgolFVNUpD_oV_YGAatcrycP1BYKJFherPGC_X9uqJ3UQqoNdf" charset="UTF-8"></script><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
   
@@ -17,13 +16,44 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
   </style>
+
+  <!-- Script Tailwind Configuração Global -->
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "sidebar-text": "#F8FAFC",
+            "primary": "#0037b0",
+            "info": "#0369A1",
+            "success": "#15803D",
+            "warning": "#B45309",
+            "danger": "#B91C1C",
+            "sidebar-surface": "#1E293B",
+            "sidebar-canvas": "#0F172A",
+            "surface-bg": "#FFFFFF",
+            "canvas-bg": "#F8FAFC",
+            "surface-muted": "#F1F5F9",
+            "surface-container": "#e5eeff",
+            "surface-container-low": "#eff4ff",
+            "surface-container-lowest": "#ffffff",
+            "primary-container": "#1d4ed8",
+            "shift-weekday": "#EFF6FF",
+            "shift-saturday": "#FEF3C7",
+            "shift-sunday": "#FEE2E2",
+          }
+        }
+      }
+    }
+  </script>
 </head>
-<body class="min-h-screen bg-[#F8FAFC] text-[#0F172A] font-sans antialiased flex flex-col">
+<body class="min-h-screen bg-canvas-bg text-slate-900 font-sans antialiased flex flex-col">
 
   <div class="flex-1 flex flex-col md:flex-row min-h-screen">
     
     <!-- SIDEBAR PERSISTENTE -->
-    <aside class="w-full md:w-64 bg-[#0F172A] text-slate-100 border-r border-slate-700/80 flex flex-col shrink-0">
+    <aside class="w-full md:w-64 bg-sidebar-canvas text-slate-100 border-r border-slate-700/80 flex flex-col shrink-0 select-none z-50">
       <div class="p-4 border-b border-slate-700/70 flex items-center justify-between">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded bg-blue-600 flex items-center justify-center text-white shadow-sm font-bold text-sm">
@@ -37,191 +67,403 @@
         <span class="px-1.5 py-0.5 text-[10px] font-bold rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">ONLINE</span>
       </div>
 
-      <nav class="flex-1 p-3 space-y-1 overflow-y-auto" id="sidebar-nav">
+      <div class="px-4 py-3">
+        <span class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Navegação Operacional</span>
+      </div>
+
+      <nav class="flex-1 px-3 space-y-1 overflow-y-auto" id="sidebar-nav">
+        <!-- Botões de Navegação -->
         <button onclick="switchTab('tab-perfuracao', this)" class="nav-tab-btn active w-full flex items-center gap-3 px-3 py-2.5 rounded text-xs font-semibold text-left transition-colors bg-blue-600 text-white shadow-sm">
           <span class="material-symbols-outlined text-lg">calendar_month</span>
           <span class="flex-1">🗓️ A1 - Perfuração</span>
           <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
         </button>
+
         <button onclick="switchTab('tab-acompanhamento', this)" class="nav-tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded text-xs font-semibold text-left text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
-          <span class="material-symbols-outlined text-lg">trending_up</span>
+          <span class="material-symbols-outlined text-lg">show_chart</span>
           <span class="flex-1">📈 Acomp. Linear</span>
           <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-900/60 text-blue-300 font-bold">Pós-Trava</span>
         </button>
+
         <button onclick="switchTab('tab-desmonte', this)" class="nav-tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded text-xs font-semibold text-left text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
-          <span class="material-symbols-outlined text-lg">bomb</span>
+          <span class="material-symbols-outlined text-lg">destruction</span>
           <span class="flex-1">💥 B2 - Desmonte & Fogo</span>
         </button>
+
         <button onclick="switchTab('tab-carga', this)" class="nav-tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded text-xs font-semibold text-left text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
           <span class="material-symbols-outlined text-lg">local_shipping</span>
           <span class="flex-1">🚛 C3 - Carga & Transp.</span>
         </button>
+
         <button onclick="switchTab('tab-beneficiamento', this)" class="nav-tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded text-xs font-semibold text-left text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
           <span class="material-symbols-outlined text-lg">factory</span>
           <span class="flex-1">🏭 D4 - Beneficiamento</span>
         </button>
+
         <button onclick="switchTab('tab-cadastro', this)" class="nav-tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded text-xs font-semibold text-left text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
-          <span class="material-symbols-outlined text-lg">construction</span>
+          <span class="material-symbols-outlined text-lg">precision_manufacturing</span>
           <span class="flex-1">🚜 C5 - Cadastros & Ativos</span>
         </button>
       </nav>
 
-      <div class="p-3 border-t border-slate-700/70 bg-slate-900/50 text-slate-400">
-        <div class="flex items-center justify-between text-xs mb-1">
-          <span>Mina Serra Sul</span>
-          <span class="text-white font-semibold">Turno A</span>
-        </div>
+      <div class="p-4 bg-sidebar-surface m-3 rounded-lg flex flex-col gap-2">
         <div class="flex items-center justify-between text-xs">
-          <span>Disponibilidade Mecânica</span>
+          <span class="uppercase tracking-wider text-slate-400 font-bold text-[10px]">Disp. Mecânica</span>
           <span class="text-emerald-400 font-bold tabular-nums">94.2%</span>
         </div>
-        <div class="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-          <div class="bg-emerald-500 h-full rounded-full" style="width: 94.2%;"></div>
+        <div class="w-full bg-sidebar-canvas rounded-full h-1.5 overflow-hidden">
+          <div class="bg-emerald-400 h-full rounded-full" style="width: 94.2%;"></div>
+        </div>
+        <div class="flex items-center justify-between pt-1 text-xs text-slate-400">
+          <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[14px]">terrain</span> Mina Serra Sul</span>
+          <span class="px-1.5 py-0.5 rounded bg-sidebar-canvas">Turno A</span>
         </div>
       </div>
     </aside>
 
-    <!-- CONTEÚDO PRINCIPAL -->
-    <main class="flex-1 flex flex-col overflow-y-auto">
+    <!-- ÁREA DE CONTEÚDO (DIREITA) -->
+    <div class="flex-1 flex flex-col min-h-screen relative">
       
-      <!-- ABA A1: PERFURAÇÃO & MALHA -->
-      <section id="tab-perfuracao" class="tab-content active flex-1">
-        <header class="bg-white border-b border-slate-200 px-6 py-4 flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10 shadow-sm">
-          <div class="flex flex-wrap items-center gap-4">
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Ano / Mês</span>
-              <div class="flex gap-2">
-                <span class="px-2.5 py-1 text-xs font-semibold bg-slate-100 border border-slate-200 rounded">2026</span>
-                <span class="px-2.5 py-1 text-xs font-semibold bg-slate-100 border border-slate-200 rounded">Janeiro</span>
-              </div>
-            </div>
-            <div class="h-8 w-px bg-slate-200"></div>
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Demanda Comercial</span>
-              <span class="text-xs font-bold text-slate-900 bg-blue-50 text-blue-700 px-2.5 py-1 rounded border border-blue-200">15.000 t</span>
-            </div>
-            <div>
-              <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Densidade Rocha</span>
-              <span class="text-xs font-bold text-slate-700">2,65 t/m³</span>
-            </div>
+      <!-- HEADER GLOBAL -->
+      <header class="sticky top-0 w-full h-16 bg-white/95 backdrop-blur-md shadow-sm z-40 flex items-center justify-between px-6 border-b border-slate-200">
+        <div class="flex items-center gap-4">
+          <div class="flex items-center gap-1.5 px-3 py-1 rounded bg-slate-100 text-slate-600">
+            <span class="material-symbols-outlined text-[16px]">schedule</span>
+            <span class="text-xs font-bold uppercase tracking-wider">Ciclo 24h Operacional</span>
           </div>
-
-          <div class="flex items-center gap-3">
-            <span id="badge-status-pcp" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300">
-              <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Em Rascunho
-            </span>
-            <button id="btn-lock-pcp" onclick="toggleLockPCP()" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded text-xs font-semibold shadow hover:bg-blue-700 transition-all">
-              <span class="material-symbols-outlined text-sm">lock</span>
-              <span id="lock-btn-text">Travar PCP Original</span>
-            </button>
-          </div>
-        </header>
-
-        <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div class="lg:col-span-8 space-y-4">
-            <div class="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-              <div class="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-                <span class="font-bold text-sm text-slate-800">PCP-01 • Metragem Linear e Horários Operacionais</span>
-                <span class="text-xs text-slate-500">Dias Úteis, Sábado Reduzido e Domingo</span>
-              </div>
-              <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs border-collapse">
-                  <thead class="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
-                    <tr>
-                      <th class="py-2.5 px-3 text-center">Dia</th>
-                      <th class="py-2.5 px-4">Dia Semana</th>
-                      <th class="py-2.5 px-3">Hora Ini</th>
-                      <th class="py-2.5 px-3">Hora Fim</th>
-                      <th class="py-2.5 px-3">Intervalo</th>
-                      <th class="py-2.5 px-4 text-right">Meta Linear</th>
-                    </tr>
-                  </thead>
-                  <tbody id="drillingTableBody" class="divide-y divide-slate-200">
-                    <tr class="hover:bg-slate-50">
-                      <td class="py-2.5 px-3 text-center font-bold text-blue-700 bg-blue-50/50">01</td>
-                      <td class="py-2.5 px-4 font-medium">Quinta-feira</td>
-                      <td class="py-2.5 px-3"><input type="time" value="07:00" class="time-input border rounded px-2 py-1 text-xs"></td>
-                      <td class="py-2.5 px-3"><input type="time" value="17:00" class="time-input border rounded px-2 py-1 text-xs"></td>
-                      <td class="py-2.5 px-3"><input type="time" value="01:00" class="time-input border rounded px-2 py-1 text-xs"></td>
-                      <td class="py-2.5 px-4 text-right font-bold tabular-nums">390 m</td>
-                    </tr>
-                    <tr class="hover:bg-slate-50">
-                      <td class="py-2.5 px-3 text-center font-bold text-blue-700 bg-blue-50/50">02</td>
-                      <td class="py-2.5 px-4 font-medium">Sexta-feira</td>
-                      <td class="py-2.5 px-3"><input type="time" value="07:00" class="time-input border rounded px-2 py-1 text-xs"></td>
-                      <td class="py-2.5 px-3"><input type="time" value="17:00" class="time-input border rounded px-2 py-1 text-xs"></td>
-                      <td class="py-2.5 px-3"><input type="time" value="01:00" class="time-input border rounded px-2 py-1 text-xs"></td>
-                      <td class="py-2.5 px-4 text-right font-bold tabular-nums">400 m</td>
-                    </tr>
-                    <tr class="bg-amber-50/30 hover:bg-amber-50">
-                      <td class="py-2.5 px-3 text-center font-bold text-amber-700 bg-amber-100/50">03</td>
-                      <td class="py-2.5 px-4 font-medium text-amber-800">Sábado (Reduzido)</td>
-                      <td class="py-2.5 px-3"><input type="time" value="07:00" class="time-input border border-amber-300 rounded px-2 py-1 text-xs"></td>
-                      <td class="py-2.5 px-3"><input type="time" value="15:00" class="time-input border border-amber-300 rounded px-2 py-1 text-xs"></td>
-                      <td class="py-2.5 px-3"><input type="time" value="00:45" class="time-input border border-amber-300 rounded px-2 py-1 text-xs"></td>
-                      <td class="py-2.5 px-4 text-right font-bold text-amber-800 tabular-nums">320 m</td>
-                    </tr>
-                    <tr class="bg-rose-50/30">
-                      <td class="py-2.5 px-3 text-center font-bold text-rose-700 bg-rose-100/50">04</td>
-                      <td class="py-2.5 px-4 font-medium text-rose-800">Domingo</td>
-                      <td colspan="3" class="py-2.5 px-3 text-center font-semibold text-rose-600 bg-rose-50/50">Parada Técnica / Sem Operação</td>
-                      <td class="py-2.5 px-4 text-right font-bold text-slate-400 tabular-nums">0 m</td>
-                    </tr>
-                  </tbody>
-                  <tfoot class="bg-slate-50 border-t-2 border-slate-200">
-                    <tr>
-                      <td colspan="5" class="py-3 px-4 text-right font-bold text-slate-600">Total Programado (Janeiro/2026):</td>
-                      <td class="py-3 px-4 text-right font-extrabold text-blue-700 text-sm tabular-nums">1.910 m</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div class="lg:col-span-4 space-y-4">
-            <div class="bg-white border border-slate-200 rounded-lg p-5 shadow-sm space-y-4">
-              <span class="font-bold text-sm text-slate-900 block pb-2 border-b border-slate-200">📐 Geometria da Malha de Furação</span>
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="text-[11px] font-semibold text-slate-500 uppercase">Espaçamento (E)</label>
-                  <input id="input-esp" type="number" step="0.1" value="3.5" oninput="recalcMesh()" class="w-full mt-1 border border-slate-300 rounded px-2.5 py-1.5 text-xs font-bold">
-                </div>
-                <div>
-                  <label class="text-[11px] font-semibold text-slate-500 uppercase">Afastamento (V)</label>
-                  <input id="input-afast" type="number" step="0.1" value="3.0" oninput="recalcMesh()" class="w-full mt-1 border border-slate-300 rounded px-2.5 py-1.5 text-xs font-bold">
-                </div>
-              </div>
-              <div class="pt-3 border-t border-slate-100 flex justify-between text-xs text-slate-600">
-                <span>Área de Influência / Furo:</span>
-                <span id="area-calc" class="font-bold text-slate-900">10,50 m²</span>
-              </div>
-            </div>
-
-            <div class="bg-[#0F172A] text-white p-5 rounded-lg shadow text-center">
-              <span class="text-[11px] uppercase tracking-wider text-slate-400 font-semibold block">Total de Furos Calculados</span>
-              <div id="holes-count" class="text-3xl font-extrabold text-emerald-400 my-2">122 Furos</div>
-              <div class="text-xs text-slate-400 border-t border-slate-800 pt-2 flex justify-between">
-                <span>Metragem Linear:</span>
-                <span id="total-linear-calc" class="font-bold text-white">1.390 m</span>
-              </div>
-            </div>
+          <div class="hidden md:flex items-center gap-1 text-slate-500 text-xs font-medium">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>Telemetria em Tempo Real</span>
           </div>
         </div>
-      </section>
+        <div class="flex items-center gap-4">
+          <button class="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded transition-colors" type="button">
+            <span class="material-symbols-outlined text-[16px]">tune</span>
+            <span>Parâmetros</span>
+          </button>
+          <div class="w-8 h-8 rounded-full bg-blue-700 flex items-center justify-center text-white">
+            <span class="material-symbols-outlined text-[18px]">person</span>
+          </div>
+        </div>
+      </header>
 
-      <!-- DEMAIS ABAS (Mock) -->
-      <section id="tab-acompanhamento" class="tab-content flex-1 p-6"><h2 class="text-lg font-bold">Acompanhamento Linear</h2></section>
-      <section id="tab-desmonte" class="tab-content flex-1 p-6"><h2 class="text-lg font-bold">Desmonte e Plano de Fogo</h2></section>
-      <section id="tab-carga" class="tab-content flex-1 p-6"><h2 class="text-lg font-bold">Carga e Transporte</h2></section>
-      <section id="tab-beneficiamento" class="tab-content flex-1 p-6"><h2 class="text-lg font-bold">Beneficiamento e Britagem</h2></section>
-      <section id="tab-cadastro" class="tab-content flex-1 p-6"><h2 class="text-lg font-bold">Cadastros & Ativos</h2></section>
+      <!-- MAIN CONTAINER -->
+      <main class="w-full flex-1 bg-canvas-bg p-6">
+        
+        <!-- ========================================== -->
+        <!-- ABA A1: PERFURAÇÃO & MALHA -->
+        <!-- ========================================== -->
+        <section id="tab-perfuracao" class="tab-content active flex flex-col gap-6">
+          <!-- Header Operacional -->
+          <div class="bg-white p-6 rounded-xl shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-4 border border-slate-200">
+            <div class="flex flex-col gap-1">
+              <div class="flex items-center gap-3">
+                <span class="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Módulo A1 / Planejamento Base</span>
+                <span id="badge-status-pcp" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-bold">
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping"></span> EM RASCUNHO (DESBLOQUEADO)
+                </span>
+              </div>
+              <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Perfuração e Malha Operacional (PCP Original)</h1>
+              <p class="text-xs text-slate-500">Definição da baseline mensal de perfuração primária, parâmetros geomecânicos e grade horária.</p>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+              <div class="flex items-center gap-1 px-3 py-1.5 bg-slate-100 rounded-lg">
+                <span class="text-[10px] uppercase text-slate-500 font-bold">Período:</span>
+                <span class="text-sm font-bold text-slate-900">Jan / 2026</span>
+              </div>
+              <div class="flex items-center gap-1 px-3 py-1.5 bg-slate-100 rounded-lg">
+                <span class="text-[10px] uppercase text-slate-500 font-bold">Demanda:</span>
+                <span class="text-sm font-bold text-blue-700">15.000 t</span>
+              </div>
+              <div class="flex items-center gap-1 px-3 py-1.5 bg-slate-100 rounded-lg">
+                <span class="text-[10px] uppercase text-slate-500 font-bold">Densidade:</span>
+                <span class="text-sm font-bold text-slate-900">2,65 t/m³</span>
+              </div>
+              <button id="btn-lock-pcp" onclick="toggleLockPCP()" class="flex items-center gap-1.5 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-bold rounded-lg shadow-sm transition-all">
+                <span class="material-symbols-outlined text-[18px]">lock</span>
+                <span id="lock-btn-text">Travar PCP Original</span>
+              </button>
+            </div>
+          </div>
 
-    </main>
+          <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
+            <!-- Esquerda: Tabela -->
+            <div class="xl:col-span-8 flex flex-col gap-4">
+              <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div class="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-blue-700 text-[18px]">straighten</span>
+                    <span class="font-bold text-sm text-slate-800">PCP-01: Cronograma Operacional de Metragem Linear</span>
+                  </div>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-left text-xs border-collapse">
+                    <thead class="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th class="py-2.5 px-3 text-center">Dia</th>
+                        <th class="py-2.5 px-4">Dia Semana</th>
+                        <th class="py-2.5 px-3">Hora Ini</th>
+                        <th class="py-2.5 px-3">Hora Fim</th>
+                        <th class="py-2.5 px-3">Intervalo</th>
+                        <th class="py-2.5 px-4 text-right">Meta Linear</th>
+                      </tr>
+                    </thead>
+                    <tbody id="drillingTableBody" class="divide-y divide-slate-200">
+                      <tr class="bg-blue-50/20 hover:bg-blue-50/50">
+                        <td class="py-2.5 px-3 text-center font-bold text-slate-800">01</td>
+                        <td class="py-2.5 px-4 font-medium text-slate-600">Quinta-feira</td>
+                        <td class="py-2.5 px-3"><input type="time" value="07:00" class="time-input border border-slate-300 rounded px-2 py-1 text-xs w-24"></td>
+                        <td class="py-2.5 px-3"><input type="time" value="17:00" class="time-input border border-slate-300 rounded px-2 py-1 text-xs w-24"></td>
+                        <td class="py-2.5 px-3"><input type="time" value="01:00" class="time-input border border-slate-300 rounded px-2 py-1 text-xs w-24"></td>
+                        <td class="py-2.5 px-4 text-right font-bold text-blue-700 tabular-nums">390 m</td>
+                      </tr>
+                      <tr class="bg-blue-50/20 hover:bg-blue-50/50">
+                        <td class="py-2.5 px-3 text-center font-bold text-slate-800">02</td>
+                        <td class="py-2.5 px-4 font-medium text-slate-600">Sexta-feira</td>
+                        <td class="py-2.5 px-3"><input type="time" value="07:00" class="time-input border border-slate-300 rounded px-2 py-1 text-xs w-24"></td>
+                        <td class="py-2.5 px-3"><input type="time" value="17:00" class="time-input border border-slate-300 rounded px-2 py-1 text-xs w-24"></td>
+                        <td class="py-2.5 px-3"><input type="time" value="01:00" class="time-input border border-slate-300 rounded px-2 py-1 text-xs w-24"></td>
+                        <td class="py-2.5 px-4 text-right font-bold text-blue-700 tabular-nums">400 m</td>
+                      </tr>
+                      <tr class="bg-amber-50/30 hover:bg-amber-50/50">
+                        <td class="py-2.5 px-3 text-center font-bold text-amber-700">03</td>
+                        <td class="py-2.5 px-4 font-bold text-amber-700">Sábado (Reduzido)</td>
+                        <td class="py-2.5 px-3"><input type="time" value="07:00" class="time-input border border-amber-300 bg-amber-50/50 rounded px-2 py-1 text-xs w-24"></td>
+                        <td class="py-2.5 px-3"><input type="time" value="15:00" class="time-input border border-amber-300 bg-amber-50/50 rounded px-2 py-1 text-xs w-24"></td>
+                        <td class="py-2.5 px-3"><input type="time" value="00:45" class="time-input border border-amber-300 bg-amber-50/50 rounded px-2 py-1 text-xs w-24"></td>
+                        <td class="py-2.5 px-4 text-right font-bold text-amber-700 tabular-nums">320 m</td>
+                      </tr>
+                      <tr class="bg-rose-50/30">
+                        <td class="py-2.5 px-3 text-center font-bold text-rose-700">04</td>
+                        <td class="py-2.5 px-4 font-bold text-rose-700">Domingo</td>
+                        <td colspan="3" class="py-2.5 px-3 text-center font-semibold text-rose-600">Parada Técnica / Sem Operação</td>
+                        <td class="py-2.5 px-4 text-right font-bold text-slate-400 tabular-nums">0 m</td>
+                      </tr>
+                    </tbody>
+                    <tfoot class="bg-slate-50 border-t-2 border-slate-200">
+                      <tr>
+                        <td colspan="5" class="py-3 px-4 text-right font-bold text-slate-600 uppercase text-[11px] tracking-wider">Total Mensal Consolidado:</td>
+                        <td class="py-3 px-4 text-right font-extrabold text-blue-700 text-sm tabular-nums">1.910 m</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Direita: Geometria -->
+            <div class="xl:col-span-4 space-y-4">
+              <div class="bg-white border border-slate-200 rounded-xl p-5 shadow-sm space-y-4">
+                <div class="flex items-center gap-2 border-b border-slate-200 pb-2">
+                  <span class="material-symbols-outlined text-blue-700 text-[18px]">grid_4x4</span>
+                  <span class="font-bold text-sm text-slate-900">Geometria da Malha</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="bg-slate-50 p-2 rounded border border-slate-200">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Espaçamento (E)</label>
+                    <input id="input-esp" type="number" step="0.1" value="3.5" oninput="recalcMesh()" class="w-full mt-1 border border-slate-300 rounded px-2 py-1 text-xs font-bold text-slate-800">
+                  </div>
+                  <div class="bg-slate-50 p-2 rounded border border-slate-200">
+                    <label class="text-[10px] font-bold text-slate-500 uppercase">Afastamento (V)</label>
+                    <input id="input-afast" type="number" step="0.1" value="3.0" oninput="recalcMesh()" class="w-full mt-1 border border-slate-300 rounded px-2 py-1 text-xs font-bold text-slate-800">
+                  </div>
+                </div>
+                <div class="pt-2 flex justify-between items-center text-xs">
+                  <span class="text-slate-500 font-semibold">Área de Influência:</span>
+                  <span id="area-calc" class="font-bold text-blue-700 text-sm">10,50 m²</span>
+                </div>
+              </div>
+
+              <!-- Card Escuro -->
+              <div class="bg-[#0F172A] text-slate-100 p-5 rounded-xl shadow-md flex flex-col gap-4 relative overflow-hidden">
+                <div class="absolute -right-4 -bottom-4 w-24 h-24 bg-blue-600/20 rounded-full blur-xl"></div>
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-blue-400">calculate</span>
+                  <span class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Cálculo Primário Geotécnico</span>
+                </div>
+                
+                <div class="flex flex-col">
+                  <span class="text-xs text-slate-400 font-semibold">Furos Calculados</span>
+                  <span id="holes-count" class="text-4xl font-extrabold text-white">122</span>
+                </div>
+
+                <div class="border-t border-slate-700 pt-3 flex justify-between items-center text-xs">
+                  <span class="text-slate-400">Vol. Total Linear:</span>
+                  <span id="total-linear-calc" class="font-bold text-blue-400 text-sm">1.390 m</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- ABA ACOMPANHAMENTO -->
+        <!-- ========================================== -->
+        <section id="tab-acompanhamento" class="tab-content flex flex-col gap-6">
+          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">PCP Planejado e Realizado</h1>
+            <p class="text-xs text-slate-500 mt-1">Acompanhamento de avanço linear e aderência pós-trava oficial.</p>
+          </div>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Meta Planejada Total</span>
+              <div class="text-3xl font-extrabold text-slate-900 mt-2 tabular-nums">1.910 <span class="text-sm font-normal text-slate-500">m</span></div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Executado Real</span>
+              <div class="text-3xl font-extrabold text-blue-700 mt-2 tabular-nums">1.780 <span class="text-sm font-normal text-blue-400">m</span></div>
+              <div class="mt-2 text-xs font-bold text-blue-700 bg-blue-50 inline-block px-2 py-1 rounded">93,2%</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Desvio Linear Acumulado</span>
+              <div class="text-3xl font-extrabold text-red-600 mt-2 tabular-nums">-130 <span class="text-sm font-normal text-red-400">m</span></div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Taxa de Perfuração (ROP)</span>
+              <div class="text-3xl font-extrabold text-slate-900 mt-2 tabular-nums">34,8 <span class="text-sm font-normal text-slate-500">m/h</span></div>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <div class="flex items-center gap-2 border-b border-slate-200 pb-3 mb-4">
+              <span class="material-symbols-outlined text-blue-700 text-[20px]">bar_chart</span>
+              <h3 class="font-bold text-slate-900">Gráfico de Demoras Operacionais (Pareto 80/20)</h3>
+            </div>
+            <!-- SVG Pareto Placeholder (Visualização baseada no CSS) -->
+            <div class="w-full h-48 bg-slate-50 border border-slate-200 rounded-lg flex items-end justify-around p-4 relative">
+              <div class="absolute top-10 w-full border-t-2 border-dashed border-red-500/50"></div>
+              <div class="w-16 h-32 bg-blue-700 rounded-t-md relative flex justify-center"><span class="absolute -top-6 text-xs font-bold text-slate-700">70m</span></div>
+              <div class="w-16 h-20 bg-blue-500 rounded-t-md relative flex justify-center"><span class="absolute -top-6 text-xs font-bold text-slate-700">45m</span></div>
+              <div class="w-16 h-8 bg-slate-400 rounded-t-md relative flex justify-center"><span class="absolute -top-6 text-xs font-bold text-slate-700">15m</span></div>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- ========================================== -->
+        <!-- ABA B2: DESMONTE E FOGO -->
+        <!-- ========================================== -->
+        <section id="tab-desmonte" class="tab-content flex flex-col gap-6">
+          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">B2 - Plano de Fogo e Desmonte de Rocha</h1>
+            <div class="mt-2 flex gap-4">
+              <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-semibold">Bancada: 914</span>
+              <span class="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-semibold">Rocha: Hematita</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Massa Prevista</span>
+              <div class="text-2xl font-extrabold text-slate-900 mt-1">215.685 t</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Carga Explosiva</span>
+              <div class="text-2xl font-extrabold text-amber-600 mt-1">86.822 kg</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Razão de Carga</span>
+              <div class="text-2xl font-extrabold text-blue-700 mt-1">403 g/t</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Furos</span>
+              <div class="text-2xl font-extrabold text-slate-900 mt-1">323</div>
+            </div>
+          </div>
+
+          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h3 class="font-bold text-slate-900 border-b border-slate-200 pb-2 mb-4">Requisição e Balanço do Paiol (R-105)</h3>
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-100 text-slate-600">
+                <tr>
+                  <th class="p-2">Insumo</th>
+                  <th class="p-2 text-right">Solicitado</th>
+                  <th class="p-2 text-right">Carregado</th>
+                  <th class="p-2 text-right">Devolução</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr><td class="p-2 font-bold">Emulsão Bombeada</td><td class="p-2 text-right">88.000 kg</td><td class="p-2 text-right text-blue-600 font-bold">86.822 kg</td><td class="p-2 text-right text-emerald-600 font-bold">1.178 kg</td></tr>
+                <tr><td class="p-2 font-bold">Boosters Pentolite</td><td class="p-2 text-right">330 un</td><td class="p-2 text-right text-blue-600 font-bold">323 un</td><td class="p-2 text-right text-emerald-600 font-bold">7 un</td></tr>
+                <tr><td class="p-2 font-bold">Detonador Não-Elétrico</td><td class="p-2 text-right">350 un</td><td class="p-2 text-right text-blue-600 font-bold">338 un</td><td class="p-2 text-right text-emerald-600 font-bold">12 un</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- ABA C3: CARGA E TRANSPORTE -->
+        <!-- ========================================== -->
+        <section id="tab-carga" class="tab-content flex flex-col gap-6">
+          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">C3 - Carga & Transporte (Despacho)</h1>
+            <p class="text-xs text-slate-500 mt-1">14 Caminhões em Ciclo • Despacho VIMS</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-[#0F172A] p-5 rounded-xl shadow-md text-white">
+              <span class="text-[10px] font-bold text-slate-400 uppercase">Match Factor Global</span>
+              <div class="text-4xl font-extrabold text-emerald-400 mt-2">0,98</div>
+              <div class="text-xs text-slate-400 mt-1">Circuito Equilibrado</div>
+            </div>
+            
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 col-span-2">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Frente 01 • Mina Sul (Escavadeira CAT 6060)</span>
+              <div class="grid grid-cols-2 gap-4 mt-4">
+                <div><span class="text-xs text-slate-500">Ciclo Médio:</span> <span class="font-bold text-sm block">22,0 min</span></div>
+                <div><span class="text-xs text-slate-500">Distância DMT:</span> <span class="font-bold text-sm block">3,4 km</span></div>
+                <div><span class="text-xs text-slate-500">Taxa Inst. Enchimento:</span> <span class="font-bold text-blue-700 text-lg block">3.820 t/h</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- ABA D4: BENEFICIAMENTO -->
+        <!-- ========================================== -->
+        <section id="tab-beneficiamento" class="tab-content flex flex-col gap-6">
+          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">D4 - Planta de Beneficiamento e Britagem</h1>
+            <p class="text-xs text-slate-500 mt-1">Circuito Fechado C2 Online</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Realizado Integrador Usina</span>
+              <div class="text-3xl font-extrabold text-blue-700 mt-2">348.600 t</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">Gap Operacional</span>
+              <div class="text-3xl font-extrabold text-red-600 mt-2">-31.400 t</div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold text-slate-500 uppercase">OEE Global da Usina</span>
+              <div class="text-3xl font-extrabold text-emerald-600 mt-2">83,5%</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ========================================== -->
+        <!-- ABA C5: CADASTROS -->
+        <!-- ========================================== -->
+        <section id="tab-cadastro" class="tab-content flex flex-col gap-6">
+          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">C5 - Gestão de Ativos</h1>
+          </div>
+          <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex items-center justify-center h-48">
+            <p class="text-slate-500 font-medium">Módulo de manutenção e telemetria de motores em desenvolvimento.</p>
+          </div>
+        </section>
+
+      </main>
+    </div>
   </div>
 
+  <!-- SCRIPT LÓGICO -->
   <script>
-    // 1. AS FUNÇÕES VISUAIS VÊM PRIMEIRO (Garante que os botões funcionam sempre)
+    // --- NAVEGAÇÃO DE ABAS ---
     function switchTab(tabId, btn) {
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.nav-tab-btn').forEach(b => {
@@ -233,6 +475,7 @@
       btn.classList.add('active', 'bg-blue-600', 'text-white', 'shadow-sm');
     }
 
+    // --- CÁLCULO DE MALHA DA ABA A1 ---
     function recalcMesh() {
       const esp = parseFloat(document.getElementById('input-esp').value) || 3.5;
       const afast = parseFloat(document.getElementById('input-afast').value) || 3.0;
@@ -243,24 +486,23 @@
       document.getElementById('total-linear-calc').textContent = Math.round(holes * 11.4) + ' m';
     }
 
-    // 2. CONFIGURAÇÃO SEGURA DO SUPABASE
-    // AVISO: Substitua a URL e a Chave abaixo pelas suas, mantendo as aspas.
-    // Se a URL não começar com https://, o sistema foi desenhado para não quebrar a tela.
-    const supabaseUrl = 'COLE_AQUI_SUA_URL_SUPABASE'; // Exemplo: 'https://xyz.supabase.co'
-    const supabaseKey = 'COLE_AQUI_SUA_CHAVE_ANON_PUBLIC'; 
+    // --- SUPABASE SETUP BLINDADO ---
+    // Substitua os valores reais aqui!
+    const supabaseUrl = 'SUA_URL_SUPABASE'; 
+    const supabaseKey = 'SUA_CHAVE_ANON_PUBLIC'; 
     
     let dbCliente = null;
     try {
         if (supabaseUrl.startsWith('https://')) {
             dbCliente = window.supabase.createClient(supabaseUrl, supabaseKey);
         } else {
-            console.warn("URL do Supabase inválida. O botão de Travar não enviará dados para a nuvem.");
+            console.warn("URL Supabase inválida. Botão apenas testará o visual.");
         }
     } catch (e) {
-        console.error("Falha ao carregar Supabase: ", e);
+        console.error("Falha no script do Supabase", e);
     }
 
-    // 3. LÓGICA DE LOCALSTORAGE E TRAVA
+    // --- LOCALSTORAGE & TRAVA ---
     let isLocked = false;
 
     function carregarRascunhoOffline() {
@@ -280,9 +522,7 @@
                 }
             }
             });
-        } catch (e) {
-            console.error("Erro ao ler rascunho offline");
-        }
+        } catch (e) {}
       }
     }
 
@@ -328,9 +568,8 @@
             .update({ travado: false })
             .eq('mes_referencia', '2026-01')
             .eq('setor', 'Perfuracao');
-
             if (error) {
-                alert("Erro ao destravar na nuvem: " + error.message);
+                alert("Erro ao destravar: " + error.message);
                 btnText.textContent = "Destravar Rascunho";
                 return;
             }
@@ -350,7 +589,7 @@
 
       } else {
         // Travar
-        btnText.textContent = "Salvando no Banco...";
+        btnText.textContent = "Salvando...";
         btn.classList.add('opacity-50', 'cursor-not-allowed');
 
         const linhas = document.querySelectorAll('#drillingTableBody tr');
@@ -381,13 +620,11 @@
             }, { onConflict: 'mes_referencia, setor' });
 
             if (error) {
-                alert("Erro ao salvar na nuvem. Os dados estão locais. Erro: " + error.message);
+                alert("Erro no Supabase. " + error.message);
                 btnText.textContent = "Travar PCP Original";
                 btn.classList.remove('opacity-50', 'cursor-not-allowed');
                 return;
             }
-        } else {
-            alert("Atenção: Supabase não configurado. O PCP foi travado visualmente, mas não salvo na nuvem.");
         }
 
         isLocked = true;
